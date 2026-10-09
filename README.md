@@ -200,11 +200,25 @@ the "why does this matter" case is made before any dial is touched.
 ### Backend
 - FastAPI + SQLAlchemy, schema shared 1:1 with the frontend's graph IDs (no
   ID-reconciliation layer needed if the frontend later becomes
-  backend-authoritative).
+  backend-authoritative) — including a real `Institution` table for
+  banks/insurers, previously only ever dangling edge-endpoint strings.
+- **Migration-managed schema** — Alembic, no `create_all()`.
+- **A real ML layer**: scikit-learn `IsolationForest` + rolling z-score
+  weather anomaly detection, requiring both methods to agree before
+  flagging a day anomalous (`GET /api/weather/anomalies`).
+- **A real NLP layer**: TF-IDF semantic search and gazetteer entity-linking
+  over news/evidence (`GET /api/search/semantic`; fetched articles are
+  linked to the specific companies/regions they mention).
+- Per-scenario and per-portfolio **data-quality rollups** — what share of a
+  result is actually evidence-backed, computed once per run/portfolio, not
+  eyeballed from the graph.
+- A real **geocoding pipeline** (free Nominatim) for new assets, replacing
+  an asserted `'approximate'` default.
 - Every connector reports an honest status (`ok` / `unconfigured` / `error`
   / `mock`) — never a silently empty success.
-- 15 passing backend tests: financial-formula parity with the frontend,
-  connector honesty under failure, API surface.
+- 40 passing backend tests: financial/insurance-formula parity with the
+  frontend, connector honesty under failure, ML/NLP/data-quality coverage,
+  API surface.
 
 ## Architecture
 
@@ -221,12 +235,15 @@ flowchart LR
         Store --> Pages
     end
 
-    subgraph Backend["Backend — FastAPI + SQLAlchemy + SQLite"]
+    subgraph Backend["Backend — FastAPI + SQLAlchemy + Alembic + SQLite"]
         API["Typed REST endpoints"]
-        DB[("SQLite\nseeded 1:1 from indiaGraphData.ts")]
+        DB[("SQLite, migration-managed\nseeded 1:1 from indiaGraphData.ts\nnow incl. Institution (banks/insurers)")]
+        MLNLP["ML anomaly detector (scikit-learn)\nNLP semantic search + entity-linking"]
         Connectors["7 connectors — honest\nok/unconfigured/error/mock status"]
         API --> DB
         API --> Connectors
+        API --> MLNLP
+        MLNLP --> DB
     end
 
     subgraph External["Real external APIs"]
@@ -264,7 +281,8 @@ rationale, including why SQLite over Postgres/PostGIS at this stage.
 | Animation | `framer-motion` |
 | Styling | Tailwind CSS v4 |
 | Backend | FastAPI, SQLAlchemy 2.0, Pydantic v2 |
-| Database | SQLite (Postgres/PostGIS-ready via `DATABASE_URL`) |
+| Database | SQLite (Postgres/PostGIS-ready via `DATABASE_URL`), migration-managed via Alembic |
+| ML / NLP | scikit-learn (`IsolationForest`, TF-IDF + cosine similarity), numpy |
 | HTTP client | `httpx` (async) |
 | Testing | `pytest` + `pytest-asyncio` (backend), `tsc --noEmit` (frontend) |
 

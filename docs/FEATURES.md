@@ -122,8 +122,15 @@ screenshots.
 | Feature | Implementation | Tag |
 |---|---|---|
 | Typed REST API | FastAPI routers under `backend/app/api/` | Real |
-| Schema shared 1:1 with frontend graph IDs | `backend/seed_graph.json`, exported from `indiaGraphData.ts` | Real |
+| Migration-managed schema | Alembic (`backend/alembic/`) — no `create_all()`; every constraint named for SQLite batch-rebuild compatibility | Real |
+| Schema shared 1:1 with frontend graph IDs, including institutions | `backend/seed_graph.json`, exported from `indiaGraphData.ts`; `Institution` table for banks/insurers | Real |
 | Financial formula parity with frontend | `backend/app/services/financial.py`, numerically verified identical — `tests/test_financial.py` | Real |
+| Insurance/protection-gap parity with frontend | `backend/app/services/insurance.py` ports `lib/insurance.ts` over real `Institution`/`Company.insurer_id` columns | Real |
 | 7 external connectors with honest status reporting | `backend/app/connectors/*.py` — `ok` / `unconfigured` / `error` / `mock`, never a faked success | Real |
 | OSM Overpass connector, cached per bounding box | `osm_overpass.py` + `OsmWay` model | Real (environment-dependent reachability, documented in `docs/DATA_STRATEGY.md`) |
-| 15 passing tests | `backend/tests/` | Real |
+| ML weather anomaly detector | `services/ml_anomaly.py` (z-score + IsolationForest) → `GET /api/weather/anomalies`, persisted to `WeatherAnomaly` | Modeled (real unsupervised ML over real data) |
+| NLP semantic search + entity-linking | `services/nlp.py` (TF-IDF/cosine, gazetteer+difflib) → `GET /api/search/semantic`, `NewsEntityLink` | Modeled (real NLP, intentionally lightweight) |
+| Per-scenario & per-portfolio data-quality rollups | `services/data_quality.py` → `ScenarioRun.data_quality_score`, `GET /api/portfolios/{id}/data-quality` | Modeled |
+| Real geocoding pipeline | `services/geocoding.py` (free Nominatim) → `POST /api/assets` | Sourced (per-call), honestly labeled on failure |
+| In-process TTL cache + structured request logging | `services/cache.py`, `logging_config.py` | Real |
+| 40 passing tests | `backend/tests/` | Real |

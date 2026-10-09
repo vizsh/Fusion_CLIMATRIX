@@ -29,11 +29,36 @@ python -m venv .venv
 cp .env.example .env
 ```
 
+## Migrate the database
+
+The schema is **migration-managed** (Alembic) — there is no
+`Base.metadata.create_all()` anywhere in the app anymore. A fresh checkout
+(or any time the models change) needs one command:
+
+```bash
+.venv/Scripts/python.exe -m alembic upgrade head
+```
+
+To generate a new migration after changing a model in `app/models/entities.py`:
+
+```bash
+.venv/Scripts/python.exe -m alembic revision --autogenerate -m "describe the change"
+.venv/Scripts/python.exe -m alembic upgrade head
+```
+
+SQLite can't run most `ALTER TABLE` statements directly — `alembic/env.py`
+sets `render_as_batch=True` so Alembic rebuilds the table instead, but any
+`CheckConstraint`/`ForeignKey` added this way must be explicitly named
+(SQLite's batch-rebuild requires it) or the migration will fail with
+`Constraint must have a name`. All constraints in `entities.py` are named
+for exactly this reason.
+
 ## Seed the database
 
 The seed data is a 1:1 export of the frontend's dataset
 (`frontend/src/lib/indiaGraphData.ts`), so the API and the UI describe the
-same companies, hazards and dependency edges.
+same companies, hazards, institutions (banks/insurers) and dependency
+edges — run `alembic upgrade head` first.
 
 ```bash
 .venv/Scripts/python.exe -m app.db.seed
@@ -71,19 +96,49 @@ the bundled dataset.
 .venv/Scripts/python.exe -m pytest tests/ -v
 ```
 
-10 tests: 6 on the financial formula (parity with the frontend's
+40 tests: 6 on the financial formula (parity with the frontend's
 `stressPdLgd`/`computeImpact`, monotonicity, the 95% cap, per-company
-summation vs. blended averages, mitigation math), 4 on the API (health,
-company CRUD + 404, scenario-run validation, scenario persistence).
+summation vs. blended averages, mitigation math), the API surface (health,
+company CRUD + 404, scenario-run validation and persistence, infra/OSM),
+connector honesty under missing/failed credentials, and
+`test_ml_nlp_dbms.py`'s coverage of the ML anomaly detector, NLP semantic
+search/entity-linking, the data-quality rollups, and the insurance/
+institution service.
+
+## ML, NLP and data-quality layer
+
+- **`app/services/ml_anomaly.py`** — real scikit-learn anomaly detection
+  (rolling z-score + `IsolationForest`) over a location's own weather
+  history, exposed at `GET /api/weather/anomalies`. Flags a day only when
+  both methods agree.
+- **`app/services/nlp.py`** — TF-IDF + cosine-similarity semantic search
+  (`GET /api/search/semantic`) and gazetteer-based entity-linking, wired
+  into both news endpoints so a fetched article is linked to the specific
+  companies/regions it mentions (`NewsEntityLink`), not just tagged with
+  its search query.
+- **`app/services/data_quality.py`** — per-scenario-run and per-portfolio
+  evidence-weighted data-quality rollups (`ScenarioRun.data_quality_score`,
+  `GET /api/portfolios/{id}/data-quality`).
+- **`app/services/geocoding.py`** — real geocoding via the free Nominatim
+  API, used by `POST /api/assets` instead of defaulting every new asset's
+  `geo_confidence` to `'approximate'`.
+- **`app/services/insurance.py`** — the protection-gap and insurer-book
+  calculations ported from the frontend's `lib/insurance.ts`, now that
+  `Institution` (banks/insurers) and `Company.insurer_id` are real,
+  queryable columns instead of dangling edge-endpoint strings. Exposed at
+  `GET /api/institutions` and `GET /api/institutions/{id}/book`.
+- **`app/services/cache.py`** — a small in-process TTL cache applied to
+  the connector-backed weather endpoints, so a free/shared API isn't
+  re-hit on every request for the same arguments.
 
 ## What's real vs. not in this backend
 
-- **Real**: the schema, the seeded graph (matches the frontend exactly), the
+- **Real**: the migration-managed schema (see above), the seeded graph
+  including financial institutions (matches the frontend exactly), the
   ECL/scenario calculation (numerically verified identical to the frontend
-  — see `tests/test_financial.py`), the NASA POWER connector (a genuine live
-  external HTTP call with caching and honest error states).
+  — see `tests/test_financial.py`), 7 live external connectors, the ML
+  anomaly detector and NLP search/linking above (all genuine computations
+  over real or realistic data, not hardcoded).
 - **Not implemented**: auth, multi-tenant org boundaries beyond the schema
-  column, Alembic migrations (schema is created via `create_all` — fine for
-  a prototype, not for production), the chatbot, the full portfolio
-  dashboard, review-task tracking, CSV import endpoints. See
-  `docs/DATA_STRATEGY.md` for the prioritized plan.
+  column, the full portfolio dashboard, review-task tracking, CSV import
+  endpoints. See `docs/DATA_STRATEGY.md` for the prioritized plan.

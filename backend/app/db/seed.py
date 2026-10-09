@@ -11,19 +11,17 @@ import json
 from pathlib import Path
 
 from app.db.session import Base, SessionLocal, engine
-from app.models import Company, DependencyEdge, EvidenceRecord, HazardEvent, Organization, Portfolio, Position
+from app.models import Company, DependencyEdge, EvidenceRecord, HazardEvent, Institution, Organization, Portfolio, Position
 
 SEED_FILE = Path(__file__).resolve().parent.parent.parent / "seed_graph.json"
 
-# Node kinds that aren't modeled as their own table yet (infra/supplier/
-# bank/govt/insurer) are intentionally NOT inserted as Company rows — only
-# true companies become Company records. Financial institutions, infra and
-# suppliers remain in dependency_edges as endpoints (by id/kind) for graph
-# traversal; a dedicated Institution table is a natural next step, noted in
-# docs/DATA_STRATEGY.md, kept out of scope here to avoid a schema nobody
-# queries yet.
+# infra/supplier nodes still aren't modeled as their own table — they
+# remain dependency_edges endpoints only (by id), which is fine since
+# nothing queries them as entities in their own right yet. bank/govt/
+# insurer nodes now DO get a real Institution row (see models/entities.py).
 COMPANY_KIND = "company"
 HAZARD_KIND = "hazard"
+INSTITUTION_KINDS = {"bank", "govt", "insurer"}
 
 
 def seed():
@@ -37,6 +35,30 @@ def seed():
         data = json.loads(SEED_FILE.read_text(encoding="utf-8"))
         nodes = data["NODES"]
         edges = data["EDGES"]
+
+        # Company -> insurer, derived from INSURED_BY edges, so Company rows
+        # can set insurer_id on first insert instead of a second pass.
+        insurer_of: dict[str, str] = {e["from"]: e["to"] for e in edges if e["type"] == "INSURED_BY"}
+
+        # Institutions first — companies' insurer_id FK depends on these existing.
+        for n in nodes:
+            if n["kind"] in INSTITUTION_KINDS:
+                db.add(
+                    Institution(
+                        id=n["id"],
+                        name=n["label"],
+                        kind=n["kind"],
+                        region=n.get("region", ""),
+                        sector=n.get("sector", ""),
+                        lat=n["coords"][1] if n.get("coords") else None,
+                        lng=n["coords"][0] if n.get("coords") else None,
+                        note=n.get("note", ""),
+                        ceded_reinsurance_share_pct=n.get("cededReinsuranceSharePct"),
+                        reinsurer_name=n.get("reinsurerName"),
+                        govt_subsidy_pct=n.get("govtSubsidyPct"),
+                    )
+                )
+        db.commit()
 
         for n in nodes:
             if n["kind"] == COMPANY_KIND:
@@ -54,6 +76,10 @@ def seed():
                         annual_revenue_cr=n.get("annualRevenueCr"),
                         note=n.get("note", ""),
                         is_synthetic=True,
+                        insurer_id=insurer_of.get(n["id"]),
+                        sum_insured_cr=n.get("sumInsuredCr"),
+                        premium_rate_bps=n.get("premiumRateBps"),
+                        deductible_pct=n.get("deductiblePct"),
                     )
                 )
             elif n["kind"] == HAZARD_KIND:
@@ -143,8 +169,9 @@ def seed():
         )
         db.commit()
 
-        print(f"Seeded {db.query(Company).count()} companies, {db.query(HazardEvent).count()} hazards, "
-              f"{db.query(DependencyEdge).count()} edges, {len(demo_positions)} positions.")
+        print(f"Seeded {db.query(Company).count()} companies, {db.query(Institution).count()} institutions, "
+              f"{db.query(HazardEvent).count()} hazards, {db.query(DependencyEdge).count()} edges, "
+              f"{len(demo_positions)} positions.")
     finally:
         db.close()
 

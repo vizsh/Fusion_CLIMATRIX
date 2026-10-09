@@ -17,6 +17,40 @@ class CompanyOut(BaseModel):
     annual_revenue_cr: float | None
     note: str
     is_synthetic: bool
+    insurer_id: str | None = None
+    sum_insured_cr: float | None = None
+    premium_rate_bps: float | None = None
+    deductible_pct: float | None = None
+
+
+class InstitutionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    name: str
+    kind: str
+    region: str
+    sector: str
+    note: str
+    ceded_reinsurance_share_pct: float | None
+    reinsurer_name: str | None
+    govt_subsidy_pct: float | None
+
+
+class InstitutionBookOut(BaseModel):
+    """Mirrors frontend/src/lib/insurance.ts's computeInsurerBook() shape —
+    the same claim-estimate mechanic, computed server-side."""
+
+    institution: InstitutionOut
+    policy_count: int
+    total_sum_insured_cr: float
+    total_premium_cr: float
+    expected_net_claims_cr: float
+    gross_loss_ratio: float
+    ceded_claims_cr: float
+    retained_claims_cr: float
+    farmer_paid_premium_cr: float
+    govt_subsidy_cr: float
+    evidence_class: str = "assumption"
 
 
 class PositionOut(BaseModel):
@@ -104,6 +138,11 @@ class ScenarioRunOut(BaseModel):
     stressed_el_cr: float
     mitigated_el_cr: float
     company_count: int
+    data_quality_score: float
+    sourced_weight_pct: float
+    modelled_weight_pct: float
+    assumption_weight_pct: float
+    synthetic_weight_pct: float
     created_at: datetime
 
 
@@ -164,6 +203,14 @@ class FloodQueryResult(BaseModel):
     evidence_class: str = "sourced"
 
 
+class NewsEntityLinkOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    entity_type: str
+    entity_id: str
+    entity_label: str
+    match_score: float
+
+
 class NewsArticleOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: str
@@ -175,6 +222,7 @@ class NewsArticleOut(BaseModel):
     provider: str
     relevance: float | None = None
     category: str | None = None
+    entity_links: list[NewsEntityLinkOut] = []
 
 
 class NewsQueryResult(BaseModel):
@@ -198,6 +246,67 @@ class OsmInfraResult(BaseModel):
     source: str
     cached: bool
     evidence_class: str = "sourced"
+
+
+class PortfolioDataQualityOut(BaseModel):
+    portfolio_id: str
+    position_count: int
+    companies_with_sourced_evidence: int
+    coverage_pct: float
+    evidence_class: str = "modelled"  # the rollup itself is a real computation over real evidence rows
+
+
+class AnomalyPointOut(BaseModel):
+    date: str
+    value: float
+    baseline_mean: float
+    baseline_std: float
+    z_score: float
+    isolation_forest_score: float
+    is_anomaly: bool
+    method_agreement: bool
+
+
+class WeatherAnomalyResult(BaseModel):
+    lat: float
+    lng: float
+    points: list[AnomalyPointOut]
+    anomaly_count: int
+    source: str = "NASA POWER + scikit-learn (z-score + IsolationForest)"
+    method_note: str = (
+        "A day is flagged anomalous only when a rolling z-score (|z|>2 vs. this location's own "
+        "baseline) AND an independent IsolationForest model agree — reduces false positives, not a "
+        "claim of calibrated probability."
+    )
+    evidence_class: str = "modelled"
+
+
+class SemanticSearchHit(BaseModel):
+    id: str
+    kind: str  # news | evidence
+    title: str
+    score: float
+
+
+class SemanticSearchResult(BaseModel):
+    query: str
+    hits: list[SemanticSearchHit]
+    method: str = "TF-IDF + cosine similarity (scikit-learn)"
+    evidence_class: str = "modelled"
+
+
+class AssetCreateIn(BaseModel):
+    name: str
+    kind: str  # infra | supplier | facility
+    region_hint: str = ""
+    company_id: str | None = None
+
+
+class AssetCreateResult(BaseModel):
+    asset: AssetOut
+    geocode_source: str
+    geocode_importance: float | None
+    geocode_error: str | None
 
 
 class InsiderSummaryResult(BaseModel):

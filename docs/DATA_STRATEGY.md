@@ -82,41 +82,61 @@ Two things worth calling out from building these:
 
 ## Better linkage, not just more sources
 
-These matter more than raw connector count:
+All four items below are now **done** — kept here as the record of why
+they mattered, not as an open backlog:
 
-- **Evidence-to-claim linking is currently loose.** `EvidenceRecord.subject_id`
-  is a free-text convention ("this evidence is about X"), not an enforced
-  relationship. Before adding many more evidence rows, tighten this to a
-  real foreign key (or a small polymorphic join table keyed on
-  `subject_type` + `subject_id`) so a company's page can query "give me
-  every evidence record that supports a claim about me" reliably instead of
-  by string match.
-- **Per-scenario data-quality score.** `ScenarioRun` already records which
-  companies were in scope; it doesn't yet record what fraction of the edges
-  in that scenario's propagation path were `sourced` vs `assumption` vs
-  `synthetic`. Computing that (weighted by edge `weight`, already a column)
-  gives a single honest "how much of this result is really evidence-backed"
-  number per run — the evidence-quality indicator the brief's dashboard
-  section asks for, without needing the full dashboard to show it.
-- **Geocoding confidence pipeline.** When a new asset is added (manually or
-  via a future CSV import), run it through a real geocoder and store
-  whatever confidence tier it actually resolves to, rather than defaulting
-  every new row to `approximate`. Even a free/open geocoder (Nominatim,
-  rate-limited but usable for a prototype's volume) is enough to make this
-  honest rather than asserted.
-- **A `data_quality` rollup on Portfolio.** Once evidence linking is real,
-  `GET /api/portfolios/{id}` can return a coverage percentage (how many of
-  its positions' companies have at least one `sourced` evidence record) —
-  the "data coverage indicator" from the dashboard brief, derivable from
-  data already in the schema once the linkage above exists.
+- ~~Evidence-to-claim linking is currently loose~~ — **done.**
+  `EvidenceRecord` now has a composite index on `(subject_type,
+  subject_id)` and a `CheckConstraint` on the closed set of subject types,
+  so "every evidence record about company X" is a real indexed query, not
+  a string-match convention. See `backend/app/models/entities.py`.
+- ~~Per-scenario data-quality score~~ — **done.** `ScenarioRun` now stores
+  `data_quality_score` plus the full `sourced/modelled/assumption/
+  synthetic` weight breakdown, computed once per run by
+  `backend/app/services/data_quality.py` over the actual propagation path
+  (edges reachable from the scenario's hazard, weighted by edge `weight`).
+- ~~Geocoding confidence pipeline~~ — **done.** `POST /api/assets`
+  (`backend/app/services/geocoding.py`) resolves a new asset through the
+  free Nominatim API and stores whatever confidence tier its match
+  quality actually supports, instead of defaulting to `approximate`.
+- ~~A `data_quality` rollup on Portfolio~~ — **done.**
+  `GET /api/portfolios/{id}/data-quality` returns the coverage percentage
+  (share of positions whose company has ≥1 `sourced` evidence record).
+
+### What else shipped in this pass
+
+- **A real `Institution` table.** Banks, government finance bodies and
+  insurers were previously only ever dangling string endpoints of a
+  `DependencyEdge` — no backing row, nothing queryable about an insurer's
+  reinsurance cession or a subsidized scheme's government-subsidy share.
+  `Institution` plus `Company.insurer_id`/`sum_insured_cr`/
+  `premium_rate_bps`/`deductible_pct` make the insurance graph a
+  first-class, queryable part of the schema —
+  `backend/app/services/insurance.py` ports the frontend's protection-gap
+  and insurer-book math over it.
+- **ML: a real weather anomaly detector**
+  (`backend/app/services/ml_anomaly.py`) — rolling z-score + scikit-learn
+  `IsolationForest` over a location's own NASA POWER/Open-Meteo history,
+  requiring both methods to agree before flagging a day anomalous. This
+  is the "Anomaly-triggered alerts" feature proposed below under
+  "Features these unlock" — now built.
+- **NLP: TF-IDF semantic search + gazetteer entity-linking**
+  (`backend/app/services/nlp.py`) — news articles are now linked to the
+  specific companies/regions they mention (`NewsEntityLink`), and
+  `GET /api/search/semantic` ranks news/evidence by topical similarity,
+  not just query-string match.
+- **Alembic migrations, for real.** The schema was created via
+  `Base.metadata.create_all()` with Alembic sitting unused in
+  `requirements.txt` — now `alembic upgrade head` creates and evolves the
+  schema, with every constraint explicitly named (SQLite's batch-rebuild
+  mode requires it for ALTER operations).
 
 ## Features these unlock
 
-- **Anomaly-triggered alerts**: a scheduled job re-running NASA POWER/
-  Open-Meteo for each hazard's coordinates and flagging when recent
-  precipitation crosses a threshold — a genuine, non-fabricated "something
-  changed" signal, distinct from the scenario severity dial (which stays a
-  user input, never conflated with an observed anomaly).
+- ~~Anomaly-triggered alerts~~ — **done**, see "What else shipped in this
+  pass" above (`GET /api/weather/anomalies`). Not yet on a schedule —
+  computed on demand per request, not via a background job — which
+  remains a reasonable next step if this needs to run unattended.
 - **Real landslide/flood susceptibility layers** (Bhuvan/ISRO, where terms
   allow) to replace the hand-drawn HP flood ribbon's severity-to-waterlevel
   assumption and the UK illustrative zone with sourced susceptibility

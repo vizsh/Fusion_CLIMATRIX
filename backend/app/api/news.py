@@ -8,12 +8,43 @@ from app.connectors.alpha_ai import AlphaAiConnector
 from app.connectors.base import ConnectorStatus
 from app.connectors.news import NewsConnector
 from app.db.session import get_db
-from app.models import NewsArticle
+from app.models import Company, NewsArticle, NewsEntityLink
 from app.schemas.schemas import InsiderSummaryResult, NewsQueryResult
+from app.services.nlp import link_entities
 
 router = APIRouter(prefix="/api", tags=["news"])
 _news = NewsConnector()
 _alphai = AlphaAiConnector()
+
+# Region codes -> labels, mirroring the frontend's REGION_LABEL — used only
+# as the gazetteer for entity-linking, not as a source of scenario state.
+REGION_LABELS = {
+    "HP": "Himachal Pradesh",
+    "KL": "Kerala",
+    "MH": "Marathwada",
+    "UK": "Uttarakhand",
+}
+
+
+def _link_article_entities(db: Session, article: NewsArticle) -> None:
+    """NLP entity-linking: does this article's title+description mention a
+    company or region from our own graph? Writes NewsEntityLink rows so a
+    news result becomes a linked reference instead of just a query-matched
+    string. Best-effort — a linking failure never blocks the news fetch
+    itself from succeeding."""
+    companies = [(c.id, c.name) for c in db.query(Company.id, Company.name).all()]
+    matches = link_entities(f"{article.title} {article.description}", companies, REGION_LABELS)
+    for m in matches:
+        db.add(
+            NewsEntityLink(
+                id=f"nel-{uuid.uuid4().hex[:10]}",
+                article_id=article.id,
+                entity_type=m["entity_type"],
+                entity_id=m["entity_id"],
+                entity_label=m["entity_label"],
+                match_score=m["match_score"],
+            )
+        )
 
 
 @router.get("/news/search", response_model=NewsQueryResult)
@@ -41,6 +72,9 @@ async def search_news(q: str, db: Session = Depends(get_db)):
         )
         db.add(row)
         rows.append(row)
+    db.commit()
+    for r in rows:
+        _link_article_entities(db, r)
     db.commit()
     for r in rows:
         db.refresh(r)
@@ -76,6 +110,9 @@ async def search_market_news(q: str, min_relevance: int = 1, db: Session = Depen
         )
         db.add(row)
         rows.append(row)
+    db.commit()
+    for r in rows:
+        _link_article_entities(db, r)
     db.commit()
     for r in rows:
         db.refresh(r)

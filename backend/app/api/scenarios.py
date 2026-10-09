@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models import ScenarioRun
 from app.schemas.schemas import ScenarioRunIn, ScenarioRunOut
+from app.services.data_quality import compute_scenario_data_quality
 from app.services.financial import CompanyInput, compute_scenario
 from app.services.graph import REGION_HAZARD, hazard_reach_companies
 
@@ -26,6 +27,7 @@ def run_scenario(payload: ScenarioRunIn, db: Session = Depends(get_db)):
         payload.substitutability,
         payload.interventions,
     )
+    quality = compute_scenario_data_quality(db, hazard_id)
 
     run = ScenarioRun(
         id=f"run-{uuid.uuid4().hex[:10]}",
@@ -39,6 +41,11 @@ def run_scenario(payload: ScenarioRunIn, db: Session = Depends(get_db)):
         stressed_el_cr=result.stressed_el_cr,
         mitigated_el_cr=result.mitigated_el_cr,
         company_count=result.company_count,
+        data_quality_score=quality.data_quality_score,
+        sourced_weight_pct=quality.sourced_weight_pct,
+        modelled_weight_pct=quality.modelled_weight_pct,
+        assumption_weight_pct=quality.assumption_weight_pct,
+        synthetic_weight_pct=quality.synthetic_weight_pct,
     )
     db.add(run)
     db.commit()
