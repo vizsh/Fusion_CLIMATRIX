@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { create } from 'zustand'
-import { hazardPortfolioStats, REGION_HAZARD } from '../lib/graphAnalytics'
+import { computeHazardReach, REGION_HAZARD } from '../lib/graphAnalytics'
 import { combinedReductionShare, totalInterventionCost } from '../lib/interventions'
+import { sectorVulnerability } from '../lib/sectorVulnerability'
 
 export type Hazard = 'Flood' | 'Drought' | 'Cyclone' | 'Heatwave'
 export type Substitutability = 'Limited' | 'Moderate' | 'Strong'
@@ -214,40 +215,85 @@ export function useSimulationClock() {
 }
 
 /** The one stress formula used everywhere a baseline PD/LGD needs to be
- * stressed by the scenario dials — portfolio-level or single-borrower. */
+ * stressed by the scenario dials — portfolio-level or single-borrower.
+ * `vulnerability` is a sector-specific multiplier on the severity factor
+ * (1.0 = neutral; see lib/sectorVulnerability.ts) so two borrowers under
+ * the identical scenario can carry different stressed PD if their sectors
+ * carry different climate sensitivity. */
 export function stressPdLgd(
   baselinePd: number,
   baselineLgd: number,
   severity: number,
   durationMonths: number,
   substitutability: Substitutability,
+  vulnerability = 1,
 ) {
   const subMultiplier = { Limited: 1.25, Moderate: 1.0, Strong: 0.75 }[substitutability]
   const durationFactor = Math.min(durationMonths / 12, 1)
-  const severityFactor = severity / 100
+  const severityFactor = (severity / 100) * vulnerability
   const stressedPd = Math.min(baselinePd * (1 + severityFactor * 4 * subMultiplier * (0.5 + durationFactor)), 0.95)
   const stressedLgd = Math.min(baselineLgd + severityFactor * 0.15 * subMultiplier, 0.95)
   return { stressedPd, stressedLgd }
 }
 
+export interface SectorBreakdown {
+  sector: string
+  eadCr: number
+  baselineEl: number
+  stressedEl: number
+}
+
 export interface ImpactResult {
   eadCr: number
   companyCount: number
-  baselinePd: number
+  baselinePd: number // EAD-weighted average, for display only — EL totals are summed per-company
   stressedPd: number
   baselineLgd: number
   stressedLgd: number
   baselineEl: number
   stressedEl: number
+  stressedElLow: number // sensitivity band: severity -15%
+  stressedElHigh: number // sensitivity band: severity +15%
   mitigatedEl: number
   incrementalEl: number // stressed - baseline (unmitigated)
   avoidedEl: number // stressed - mitigated
   interventionCostCr: number
+  bySector: SectorBreakdown[]
+}
+
+const SENSITIVITY_SWING = 0.15 // +/- 15% on the severity dial
+
+function sumCompanyEl(
+  companies: { eadCr?: number; baselinePd?: number; baselineLgd?: number; sector?: string }[],
+  severity: number,
+  durationMonths: number,
+  substitutability: Substitutability,
+) {
+  let baselineEl = 0
+  let stressedEl = 0
+  for (const c of companies) {
+    const ead = c.eadCr ?? 0
+    const pd = c.baselinePd ?? 0
+    const lgd = c.baselineLgd ?? 0
+    const { stressedPd, stressedLgd } = stressPdLgd(
+      pd,
+      lgd,
+      severity,
+      durationMonths,
+      substitutability,
+      sectorVulnerability(c.sector),
+    )
+    baselineEl += ead * pd * lgd
+    stressedEl += ead * stressedPd * stressedLgd
+  }
+  return { baselineEl, stressedEl }
 }
 
 /** The single financial transmission calculation every module reads from.
- * Stressed PD/LGD are a transparent function of the scenario dial inputs —
- * NOT a calibrated hazard-to-credit model. ECL = EAD x PD x LGD throughout. */
+ * Stressed PD/LGD are a transparent, disclosed function of the scenario
+ * dial inputs and each borrower's sector vulnerability — NOT a calibrated
+ * hazard-to-credit model. ECL = EAD x PD x LGD throughout, summed once per
+ * borrower (never double-counted across graph paths). */
 export function computeImpact(state: {
   region: Region
   severity: number
@@ -256,37 +302,80 @@ export function computeImpact(state: {
   interventions: string[]
 }): ImpactResult {
   const hazardId = REGION_HAZARD[state.region]
-  const portfolio = hazardPortfolioStats(hazardId)
+  const { companies, companyEAD } = computeHazardReach(hazardId)
 
-  const { stressedPd, stressedLgd } = stressPdLgd(
-    portfolio.baselinePd,
-    portfolio.baselineLgd,
-    state.severity,
+  const { baselineEl, stressedEl } = sumCompanyEl(companies, state.severity, state.durationMonths, state.substitutability)
+  const { baselineEl: lowEl, stressedEl: stressedElLow } = sumCompanyEl(
+    companies,
+    Math.max(0, state.severity * (1 - SENSITIVITY_SWING)),
     state.durationMonths,
     state.substitutability,
   )
+  const { stressedEl: stressedElHigh } = sumCompanyEl(
+    companies,
+    Math.min(100, state.severity * (1 + SENSITIVITY_SWING)),
+    state.durationMonths,
+    state.substitutability,
+  )
+  void lowEl // baseline is swing-invariant; only the stressed low/high bound is used
 
-  const baselineEl = portfolio.eadCr * portfolio.baselinePd * portfolio.baselineLgd
-  const stressedEl = portfolio.eadCr * stressedPd * stressedLgd
+  const bySectorMap = new Map<string, SectorBreakdown>()
+  for (const c of companies) {
+    const key = c.sector ?? 'Other'
+    const existing = bySectorMap.get(key) ?? { sector: key, eadCr: 0, baselineEl: 0, stressedEl: 0 }
+    const ead = c.eadCr ?? 0
+    const pd = c.baselinePd ?? 0
+    const lgd = c.baselineLgd ?? 0
+    const { stressedPd, stressedLgd } = stressPdLgd(
+      pd,
+      lgd,
+      state.severity,
+      state.durationMonths,
+      state.substitutability,
+      sectorVulnerability(c.sector),
+    )
+    existing.eadCr += ead
+    existing.baselineEl += ead * pd * lgd
+    existing.stressedEl += ead * stressedPd * stressedLgd
+    bySectorMap.set(key, existing)
+  }
+
   const incrementalEl = stressedEl - baselineEl
-
   const reduction = combinedReductionShare(state.interventions)
   const mitigatedEl = baselineEl + incrementalEl * (1 - reduction)
   const avoidedEl = stressedEl - mitigatedEl
   const interventionCostCr = totalInterventionCost(state.interventions)
 
+  const avgBaselinePd = companyEAD ? companies.reduce((s, c) => s + (c.baselinePd ?? 0) * (c.eadCr ?? 0), 0) / companyEAD : 0
+  const avgBaselineLgd = companyEAD ? companies.reduce((s, c) => s + (c.baselineLgd ?? 0) * (c.eadCr ?? 0), 0) / companyEAD : 0
+  const avgStressedPd = companyEAD
+    ? companies.reduce((s, c) => {
+        const { stressedPd } = stressPdLgd(c.baselinePd ?? 0, c.baselineLgd ?? 0, state.severity, state.durationMonths, state.substitutability, sectorVulnerability(c.sector))
+        return s + stressedPd * (c.eadCr ?? 0)
+      }, 0) / companyEAD
+    : 0
+  const avgStressedLgd = companyEAD
+    ? companies.reduce((s, c) => {
+        const { stressedLgd } = stressPdLgd(c.baselinePd ?? 0, c.baselineLgd ?? 0, state.severity, state.durationMonths, state.substitutability, sectorVulnerability(c.sector))
+        return s + stressedLgd * (c.eadCr ?? 0)
+      }, 0) / companyEAD
+    : 0
+
   return {
-    eadCr: portfolio.eadCr,
-    companyCount: portfolio.companyCount,
-    baselinePd: portfolio.baselinePd,
-    stressedPd,
-    baselineLgd: portfolio.baselineLgd,
-    stressedLgd,
+    eadCr: companyEAD,
+    companyCount: companies.length,
+    baselinePd: avgBaselinePd,
+    stressedPd: avgStressedPd,
+    baselineLgd: avgBaselineLgd,
+    stressedLgd: avgStressedLgd,
     baselineEl,
     stressedEl,
+    stressedElLow: Math.min(stressedElLow, stressedEl),
+    stressedElHigh: Math.max(stressedElHigh, stressedEl),
     mitigatedEl,
     incrementalEl,
     avoidedEl,
     interventionCostCr,
+    bySector: Array.from(bySectorMap.values()).sort((a, b) => b.stressedEl - a.stressedEl),
   }
 }

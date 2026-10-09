@@ -2,8 +2,19 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 
 import type { FeatureCollection } from 'geojson'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChevronRight, Layers, Satellite } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import {
+  AlertTriangle,
+  Building2,
+  ChevronRight,
+  Landmark,
+  Layers,
+  Package,
+  Satellite,
+  ShieldCheck,
+  Waves,
+  Zap,
+} from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MapLayerMouseEvent, MapRef } from 'react-map-gl/maplibre'
 import { Layer, Map as GLMap, Marker, NavigationControl, Popup, Source } from 'react-map-gl/maplibre'
 import EntityInspector from '../components/graph/EntityInspector'
@@ -19,14 +30,40 @@ import {
   terrainSatelliteStyle,
 } from '../lib/digitalTwinMap'
 import { cleanDistrictName, getDistrictRisk } from '../lib/districtRisk'
-import { KIND_META, NODES } from '../lib/indiaGraphData'
+import { computeFloodRibbon, loadElevationSampler, type ElevationSampler } from '../lib/floodModel'
+import { KIND_META, NODES, type NodeKind } from '../lib/indiaGraphData'
 import { useScenarioStore } from '../store/useScenarioStore'
+
+const KIND_ICON: Record<NodeKind, typeof AlertTriangle> = {
+  hazard: AlertTriangle,
+  infra: Zap,
+  supplier: Package,
+  company: Building2,
+  bank: Landmark,
+  govt: Landmark,
+  insurer: ShieldCheck,
+}
+
+function lerp(a: number, b: number, t: number) {
+  return a + (b - a) * t
+}
+
+/** Interpolates a position along a polyline at fraction t (0-1). */
+function pointAlong(line: [number, number][], t: number): [number, number] {
+  const segCount = line.length - 1
+  const segT = t * segCount
+  const i = Math.min(segCount - 1, Math.floor(segT))
+  const localT = segT - i
+  const a = line[i]
+  const b = line[i + 1]
+  return [lerp(a[0], b[0], localT), lerp(a[1], b[1], localT)]
+}
 
 type CameraLevel = 'india' | 'region' | 'valley'
 
 export default function DigitalTwinPage() {
   const mapRef = useRef<MapRef | null>(null)
-  const { region, runState, selectedEntityId, setSelectedEntity } = useScenarioStore()
+  const { region, severity, runState, selectedEntityId, setSelectedEntity } = useScenarioStore()
 
   const [styleMode, setStyleMode] = useState<'satellite' | 'institutional'>('satellite')
   const [showDistricts, setShowDistricts] = useState(true)
@@ -35,8 +72,52 @@ export default function DigitalTwinPage() {
   const [districtPopup, setDistrictPopup] = useState<{ lng: number; lat: number; name: string; risk: number } | null>(
     null,
   )
+  const [elevationSampler, setElevationSampler] = useState<ElevationSampler | null>(null)
+  const [elevationStatus, setElevationStatus] = useState<'loading' | 'ready' | 'error'>('loading')
 
   const simulated = runState !== 'idle'
+
+  // Decode the real DEM tiles once — used both by the 3D terrain (already
+  // handled by MapLibre natively) and by our own flood-ribbon computation.
+  useEffect(() => {
+    let cancelled = false
+    loadElevationSampler()
+      .then((sampler) => {
+        if (!cancelled) {
+          setElevationSampler(() => sampler)
+          setElevationStatus('ready')
+        }
+      })
+      .catch(() => !cancelled && setElevationStatus('error'))
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const computedFlood = useMemo(
+    () => computeFloodRibbon(elevationSampler, severity),
+    [elevationSampler, severity],
+  )
+  const floodGeometry = computedFlood ?? HP_FLOOD_EXTENT
+
+  // Traveling pulse along the disrupted corridor — makes the propagation
+  // feel active rather than a static red line once a scenario is running.
+  const [pulseT, setPulseT] = useState(0)
+  useEffect(() => {
+    if (!simulated || region !== 'HP') return
+    let raf: number
+    const CYCLE_MS = 3200
+    const loop = (now: number) => {
+      setPulseT((now % CYCLE_MS) / CYCLE_MS)
+      raf = requestAnimationFrame(loop)
+    }
+    raf = requestAnimationFrame(loop)
+    return () => cancelAnimationFrame(raf)
+  }, [simulated, region])
+  const pulsePos = useMemo(
+    () => (simulated && region === 'HP' ? pointAlong(HP_NH5_ROUTE.geometry.coordinates as [number, number][], pulseT) : null),
+    [simulated, region, pulseT],
+  )
 
   function flyTo(preset: (typeof CAMERA_PRESETS)[keyof typeof CAMERA_PRESETS], level: CameraLevel) {
     mapRef.current?.getMap().flyTo({
@@ -141,7 +222,7 @@ export default function DigitalTwinPage() {
           )}
 
           {region === 'HP' && (
-            <Source type="geojson" data={HP_FLOOD_EXTENT}>
+            <Source type="geojson" data={floodGeometry}>
               <Layer
                 id="flood-extent"
                 type="fill"
@@ -171,39 +252,53 @@ export default function DigitalTwinPage() {
 
           {NODES.filter((n) => n.coords).map((n) => {
             const meta = KIND_META[n.kind]
+            const Icon = KIND_ICON[n.kind]
             const active = n.id === selectedEntityId
+            const size = n.kind === 'hazard' ? 26 : 20
             return (
               <Marker
                 key={n.id}
                 longitude={n.coords![0]}
                 latitude={n.coords![1]}
-                anchor="center"
+                anchor="bottom"
                 onClick={(e) => {
                   e.originalEvent.stopPropagation()
                   setDistrictPopup(null)
                   setSelectedEntity(active ? null : n.id)
                 }}
               >
-                <div className="group relative cursor-pointer">
+                <div className="group relative flex cursor-pointer flex-col items-center">
                   {active && (
                     <div
-                      className="absolute inset-0 -m-1.5 animate-pulse-ring rounded-full"
-                      style={{ background: meta.color }}
+                      className="absolute top-0 animate-pulse-ring rounded-full"
+                      style={{ width: size, height: size, background: meta.color }}
                     />
                   )}
                   <div
-                    className="relative rounded-full border-2 transition-transform group-hover:scale-125"
+                    className="relative flex items-center justify-center rounded-full border-2 shadow-[0_2px_8px_rgba(0,0,0,0.5)] transition-transform group-hover:scale-125"
                     style={{
-                      width: n.kind === 'hazard' ? 14 : 9,
-                      height: n.kind === 'hazard' ? 14 : 9,
+                      width: size,
+                      height: size,
                       background: meta.color,
-                      borderColor: active ? '#fff' : '#05070a',
+                      borderColor: active ? '#fff' : 'rgba(5,7,10,0.6)',
                     }}
-                  />
+                  >
+                    <Icon size={size * 0.55} color="#05070a" strokeWidth={2.4} />
+                  </div>
+                  <div className="h-2 w-px bg-white/50" />
                 </div>
               </Marker>
             )
           })}
+
+          {pulsePos && (
+            <Marker longitude={pulsePos[0]} latitude={pulsePos[1]} anchor="center">
+              <div className="relative">
+                <div className="absolute inset-0 -m-2 animate-pulse-ring rounded-full bg-risk-high" />
+                <div className="h-2.5 w-2.5 rounded-full bg-risk-high shadow-[0_0_10px_3px_rgba(251,58,74,0.7)]" />
+              </div>
+            </Marker>
+          )}
 
           {districtPopup && (
             <Popup longitude={districtPopup.lng} latitude={districtPopup.lat} anchor="bottom" closeButton={false} offset={10}>
@@ -269,6 +364,24 @@ export default function DigitalTwinPage() {
           >
             <Layers size={11} /> DISTRICT RISK
           </button>
+          {region === 'HP' && (
+            <div
+              className={`pointer-events-none flex items-center gap-1.5 rounded border px-2.5 py-1.5 font-mono text-[9px] tracking-wide backdrop-blur ${
+                elevationStatus === 'ready'
+                  ? 'border-cyan/30 bg-panel/85 text-cyan'
+                  : elevationStatus === 'error'
+                    ? 'border-risk-high/30 bg-panel/85 text-risk-high'
+                    : 'border-line bg-panel/85 text-slate-500'
+              }`}
+            >
+              <Waves size={11} />
+              {elevationStatus === 'ready'
+                ? `DEM FLOOD MODEL · +${computedFlood?.properties?.floodRiseM ?? 0}m`
+                : elevationStatus === 'error'
+                  ? 'DEM UNAVAILABLE — ILLUSTRATIVE EXTENT'
+                  : 'LOADING ELEVATION DATA…'}
+            </div>
+          )}
         </div>
 
         {/* Legend */}

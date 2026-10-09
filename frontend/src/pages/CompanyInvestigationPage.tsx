@@ -5,6 +5,7 @@ import { useSearchParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import { directFinanciers, getAncestors } from '../lib/graphAnalytics'
 import { EDGES, NODES } from '../lib/indiaGraphData'
+import { sectorVulnerability } from '../lib/sectorVulnerability'
 import { stressPdLgd, useScenarioStore } from '../store/useScenarioStore'
 
 const COMPANIES = NODES.filter((n) => n.kind === 'company')
@@ -38,6 +39,7 @@ export default function CompanyInvestigationPage() {
     scenario.severity,
     scenario.durationMonths,
     scenario.substitutability,
+    sectorVulnerability(company.sector),
   )
   const baselineEl = (company.eadCr ?? 0) * (company.baselinePd ?? 0) * (company.baselineLgd ?? 0)
   const stressedEl = (company.eadCr ?? 0) * stressedPd * stressedLgd
@@ -113,7 +115,9 @@ export default function CompanyInvestigationPage() {
               <Block icon={TrendingDown} title="Company-level stressed credit view">
                 <div className="mb-2">
                   Applying the same scenario formula used portfolio-wide (EAD × PD × LGD) to this
-                  company alone:
+                  company alone, with a {company.sector ?? 'default'} sector vulnerability
+                  multiplier of ×{sectorVulnerability(company.sector).toFixed(2)} on the severity
+                  factor:
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-[11px]">
                   <div className="rounded border border-line bg-panel-2 p-2">

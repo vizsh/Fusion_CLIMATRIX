@@ -33,6 +33,11 @@ const EVIDENCE_ITEMS: EvidenceItem[] = [
     detail: 'Illustrative severity estimates informed by which districts were worst affected in the named historical events — not an official hazard model output.',
   },
   {
+    label: 'Flood extent ribbon on the Digital Twin (Himachal Pradesh)',
+    cls: 'modelled',
+    detail: 'Computed from real elevation data (the same free Terrarium DEM tiles used for 3D terrain): the water level is set to the valley-floor elevation plus a severity-scaled rise, then grown outward from the river/road corridor until the real terrain exceeds that level. This is a disclosed geometric approximation, not a calibrated hydrological or hydraulic flood simulation — it has no knowledge of river discharge, soil saturation, drainage or flood defenses.',
+  },
+  {
     label: 'Hazard → infrastructure edges in the dependency graph',
     cls: 'sourced',
     detail: 'Which infrastructure a hazard affects is grounded in which districts the documented disaster struck.',
@@ -46,6 +51,11 @@ const EVIDENCE_ITEMS: EvidenceItem[] = [
     label: 'Stressed PD/LGD, expected credit loss (EAD × PD × LGD)',
     cls: 'modelled',
     detail: 'Computed live from the scenario dials using a transparent, disclosed formula — see Portfolio Impact for the full breakdown.',
+  },
+  {
+    label: 'Sector vulnerability multipliers and sensitivity band (±15% severity)',
+    cls: 'assumption',
+    detail: "A disclosed sector-sensitivity table (Tourism and Agriculture stress harder than IT/BPO or Pharmaceuticals under the identical scenario) and a severity sensitivity re-run — not an empirically calibrated result, and not a Monte Carlo confidence interval.",
   },
   {
     label: 'Hidden concentration risk / institution concentration rankings',
@@ -114,7 +124,7 @@ export default function EvidenceReportsPage() {
       `Baseline PD / LGD: ${(impact.baselinePd * 100).toFixed(2)}% / ${(impact.baselineLgd * 100).toFixed(1)}%`,
       `Stressed PD / LGD: ${(impact.stressedPd * 100).toFixed(2)}% / ${(impact.stressedLgd * 100).toFixed(1)}%`,
       `Baseline expected loss: ₹${impact.baselineEl.toFixed(2)} cr`,
-      `Stressed expected loss: ₹${impact.stressedEl.toFixed(2)} cr`,
+      `Stressed expected loss: ₹${impact.stressedEl.toFixed(2)} cr (sensitivity band ₹${impact.stressedElLow.toFixed(2)}–₹${impact.stressedElHigh.toFixed(2)} cr at severity ±15%)`,
       `Incremental ECL: ₹${impact.incrementalEl.toFixed(2)} cr`,
       `Mitigated expected loss: ₹${impact.mitigatedEl.toFixed(2)} cr`,
       `Modeled avoided loss: ₹${impact.avoidedEl.toFixed(2)} cr (intervention cost ₹${impact.interventionCostCr.toFixed(1)} cr)`,

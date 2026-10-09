@@ -2,24 +2,14 @@ import ReactECharts from 'echarts-for-react'
 import { motion } from 'framer-motion'
 import { useMemo } from 'react'
 import PageHeader from '../components/PageHeader'
-import { computeBottlenecks, computeHazardReach, REGION_HAZARD } from '../lib/graphAnalytics'
+import { computeBottlenecks } from '../lib/graphAnalytics'
+import { SECTOR_VULNERABILITY } from '../lib/sectorVulnerability'
 import { computeImpact, useScenarioStore } from '../store/useScenarioStore'
 
 export default function PortfolioImpactPage() {
   const state = useScenarioStore()
   const impact = computeImpact(state)
-  const hazardId = REGION_HAZARD[state.region]
-  const reach = computeHazardReach(hazardId)
   const bottlenecks = computeBottlenecks(5)
-
-  const sectorData = useMemo(() => {
-    const bySector = new Map<string, number>()
-    for (const c of reach.companies) {
-      const key = c.sector ?? 'Other'
-      bySector.set(key, (bySector.get(key) ?? 0) + (c.eadCr ?? 0))
-    }
-    return Array.from(bySector.entries()).sort((a, b) => b[1] - a[1])
-  }, [reach.companies])
 
   const option = useMemo(
     () => ({
@@ -34,7 +24,7 @@ export default function PortfolioImpactPage() {
       },
       yAxis: {
         type: 'category',
-        data: sectorData.map(([s]) => s),
+        data: impact.bySector.map((s) => s.sector),
         axisLine: { lineStyle: { color: '#1c2430' } },
         axisTick: { show: false },
         axisLabel: { color: '#94a3b8', fontSize: 10.5, fontFamily: 'JetBrains Mono' },
@@ -42,14 +32,14 @@ export default function PortfolioImpactPage() {
       series: [
         {
           type: 'bar',
-          data: sectorData.map(([, v]) => Math.round(v)),
+          data: impact.bySector.map((s) => Number(s.stressedEl.toFixed(2))),
           barWidth: 14,
-          itemStyle: { color: '#22d3ee', borderRadius: [0, 3, 3, 0] },
+          itemStyle: { color: '#fb3a4a', borderRadius: [0, 3, 3, 0] },
         },
       ],
       tooltip: { trigger: 'axis', axisPointer: { type: 'none' } },
     }),
-    [sectorData],
+    [impact.bySector],
   )
 
   return (
@@ -57,7 +47,7 @@ export default function PortfolioImpactPage() {
       <PageHeader
         title="PORTFOLIO IMPACT"
         subtitle="BASELINE · STRESSED · MITIGATED — TRANSPARENT FINANCIAL TRANSMISSION"
-        tag="ECL = EAD × PD × LGD"
+        tag="ECL = EAD × PD × LGD, PER BORROWER, SECTOR-WEIGHTED"
       />
 
       <div className="bg-grid p-6">
@@ -72,10 +62,36 @@ export default function PortfolioImpactPage() {
           <BigStat label="Incremental ECL (Δ)" value={`₹${impact.incrementalEl.toFixed(2)} cr`} color="#f5a524" />
         </motion.div>
 
+        <div className="mb-6 rounded-lg border border-line bg-panel-2 p-4">
+          <div className="mb-2 flex items-center justify-between font-mono text-[10px] tracking-[0.15em] text-slate-500">
+            <span>SENSITIVITY TO SEVERITY (±15%)</span>
+            <span className="text-slate-400">
+              ₹{impact.stressedElLow.toFixed(2)} cr — ₹{impact.stressedElHigh.toFixed(2)} cr
+            </span>
+          </div>
+          <div className="relative h-2 w-full overflow-hidden rounded-full bg-line-soft">
+            <div
+              className="absolute h-full rounded-full bg-risk-high/30"
+              style={{
+                left: `${(impact.stressedElLow / impact.stressedElHigh) * 100}%`,
+                right: 0,
+              }}
+            />
+            <div
+              className="absolute top-1/2 h-3 w-0.5 -translate-y-1/2 bg-risk-high"
+              style={{ left: `${(impact.stressedEl / impact.stressedElHigh) * 100}%` }}
+            />
+          </div>
+          <p className="mt-2 text-[10.5px] leading-relaxed text-slate-600">
+            Point estimate shown as the marker. Band is a disclosed sensitivity test — rerunning
+            the same formula at severity ±15% — not a Monte Carlo or confidence interval.
+          </p>
+        </div>
+
         <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
           <div className="rounded-lg border border-line bg-panel-2 p-4">
             <div className="mb-2 font-mono text-[10px] tracking-[0.15em] text-slate-500">
-              PD / LGD — BASELINE VS STRESSED
+              PD / LGD — BASELINE VS STRESSED (EAD-WEIGHTED AVG)
             </div>
             <div className="grid grid-cols-2 gap-3">
               <MiniStat label="PD baseline → stressed" value={`${(impact.baselinePd * 100).toFixed(1)}% → ${(impact.stressedPd * 100).toFixed(1)}%`} />
@@ -93,14 +109,32 @@ export default function PortfolioImpactPage() {
 
           <div className="rounded-lg border border-line bg-panel-2 p-4">
             <div className="mb-2 font-mono text-[10px] tracking-[0.15em] text-slate-500">
-              SECTOR ATTRIBUTION — REACHABLE EAD (₹ CR)
+              SECTOR ATTRIBUTION — STRESSED EL (₹ CR)
             </div>
-            {sectorData.length ? (
+            {impact.bySector.length ? (
               <ReactECharts option={option} style={{ height: 180 }} />
             ) : (
               <p className="text-[11px] text-slate-600">No companies reachable from the current hazard.</p>
             )}
           </div>
+        </div>
+
+        <div className="mb-6 rounded-lg border border-line bg-panel-2 p-4">
+          <div className="mb-2 font-mono text-[10px] tracking-[0.15em] text-slate-500">
+            SECTOR VULNERABILITY MULTIPLIERS (DISCLOSED ASSUMPTION)
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(SECTOR_VULNERABILITY).map(([sector, mult]) => (
+              <div key={sector} className="rounded border border-line px-2 py-1 text-[10.5px] text-slate-400">
+                {sector} <span className="font-mono-tnum text-slate-300">×{mult.toFixed(2)}</span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-[10.5px] leading-relaxed text-slate-600">
+            Multiplies the severity factor before it enters the stressed-PD formula, so e.g.
+            Tourism stresses harder than IT/BPO under the identical scenario — a disclosed
+            modeling assumption, not an empirically calibrated result.
+          </p>
         </div>
 
         <div className="rounded-lg border border-line bg-panel-2 p-4">
@@ -119,10 +153,10 @@ export default function PortfolioImpactPage() {
 
         <p className="mt-5 max-w-3xl text-[10.5px] leading-relaxed text-slate-600">
           ECL = EAD × PD × LGD. Incremental ECL = Stressed ECL − Baseline ECL. Each borrower's
-          operational and credit effect is counted once; this view does not add overlapping
-          supplier, infrastructure and borrower impacts as if they were independent losses. Public
-          reconstruction costs are not included here — see the Digital Twin's government-finance
-          nodes, which are modeled as a separate layer.
+          stressed PD/LGD is computed individually (sector vulnerability applied per company) and
+          summed once — this view does not add overlapping supplier, infrastructure and borrower
+          impacts as if they were independent losses. Public reconstruction costs are not included
+          here — see the Digital Twin's government-finance nodes, modeled as a separate layer.
         </p>
       </div>
     </div>
