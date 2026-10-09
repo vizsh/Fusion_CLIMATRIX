@@ -1,5 +1,6 @@
 import { ChevronDown, Download } from 'lucide-react'
 import { useState } from 'react'
+import LiveWeatherPanel from '../components/LiveWeatherPanel'
 import PageHeader from '../components/PageHeader'
 import { EVIDENCE_META, type EvidenceClass } from '../lib/evidence'
 import { INTERVENTIONS } from '../lib/interventions'
@@ -153,6 +154,10 @@ export default function EvidenceReportsPage() {
       />
 
       <div className="bg-grid p-6">
+        <div className="mb-6 max-w-3xl">
+          <LiveWeatherPanel />
+        </div>
+
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-1.5">
             {(Object.keys(EVIDENCE_META) as EvidenceClass[]).map((cls) => {

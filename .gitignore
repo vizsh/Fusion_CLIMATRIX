@@ -6,3 +6,11 @@ dist/
 *.log
 .DS_Store
 scratch_geo/
+
+# backend
+backend/.venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/climatrix.db
+backend/.pytest_cache/
+backend/server.log
