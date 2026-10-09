@@ -26,6 +26,7 @@ import {
 import { computeInsuranceAdjustedCredit, computeInsurerBook, computeProtectionGap, allInsurers, formatLossRatio } from '../insurance'
 import { getWeatherAnomalies, semanticSearch } from '../api'
 import { NODES } from '../indiaGraphData'
+import { findBreachingSeverity } from '../reverseStressTest'
 import { sectorVulnerability } from '../sectorVulnerability'
 import { WEATHER_WINDOWS } from '../weatherWindows'
 import { REGION_LABEL, computeImpact, stressPdLgd, type ScenarioState } from '../../store/useScenarioStore'
@@ -636,6 +637,38 @@ export function answerCompareRegions(regionA: Region, regionB: Region, p: Scenar
   ]
 }
 
+/** Reverse stress test — "what severity would it take to lose ₹500 cr in
+ * Himachal Pradesh." Binary search over the existing engine
+ * (lib/reverseStressTest.ts), not a new model — the feature identified by
+ * reviewing shreyascoder2006/fusion_earth's own plan doc, which listed
+ * this as a P2 item it never built. */
+export function answerReverseStressTest(region: Region, targetLossCr: number, p: ScenarioParams): CopilotBlock[] {
+  const result = findBreachingSeverity(region, targetLossCr, p.durationMonths, p.substitutability)
+  return [
+    { kind: 'heading', text: `Reverse stress test — ${REGION_LABEL[region]}` },
+    {
+      kind: 'text',
+      text:
+        result.breachingSeverity !== null
+          ? `A stressed EL of ₹${targetLossCr.toFixed(0)} cr or more is first reached at severity ${result.breachingSeverity}/100 (holding duration at ${p.durationMonths} months, substitutability ${p.substitutability}).`
+          : `Even at maximum severity (100/100, ${p.durationMonths} months, ${p.substitutability}), stressed EL only reaches ₹${result.lossAtMaxSeverity.toFixed(1)} cr — this threshold isn't reachable at these dials. Try a longer duration or lower substitutability.`,
+    },
+    {
+      kind: 'statRow',
+      stats: [
+        { label: 'Target loss', value: fmtCr(targetLossCr), evidence: 'assumption' },
+        { label: 'Breaching severity', value: result.breachingSeverity !== null ? `${result.breachingSeverity}/100` : 'Not reachable', evidence: 'modelled' },
+        { label: 'Loss at severity 100', value: fmtCr(result.lossAtMaxSeverity), evidence: 'modelled' },
+      ],
+    },
+    {
+      kind: 'text',
+      text: 'Found by binary search over the same engine every other page uses (computeImpact) — a real search, not a lookup table.',
+    },
+    { kind: 'actions', actions: result.breachingSeverity !== null ? [{ id: 'rst-apply', label: 'Apply this severity in Scenario Lab', kind: 'apply-scenario', region, severity: result.breachingSeverity, durationMonths: p.durationMonths, substitutability: p.substitutability }] : [] },
+  ]
+}
+
 export function answerMethodology(): CopilotBlock[] {
   return [
     { kind: 'heading', text: 'How these numbers are actually calculated' },
@@ -737,6 +770,7 @@ export function answerHelp(): CopilotBlock[] {
         'Compare Himachal Pradesh and Kerala.',
         'How is expected credit loss actually calculated?',
         'Has anything anomalous happened with the weather in Himachal Pradesh?',
+        'What severity would it take to breach ₹500 cr in losses here?',
         'Search news about drought in Marathwada.',
         'Which of my investments are exposed to risky transport routes in Himachal Pradesh?',
         'Which exposures may be uninsured or underinsured?',

@@ -102,6 +102,16 @@ export function detectSubstitutability(text: string): Substitutability | null {
   return null
 }
 
+/** "What severity would it take to lose ₹500 cr" — the reverse-stress-test
+ * target. Requires a currency/loss cue next to the number, not a bare
+ * figure, so an unrelated number in the sentence doesn't misfire. */
+export function detectTargetLossCr(text: string): number | null {
+  const m = text.match(/(?:₹|rs\.?|inr)?\s*(\d+(?:\.\d+)?)\s*cr(?:ore)?s?\b/i)
+  if (!m) return null
+  const n = parseFloat(m[1])
+  return n > 0 ? n : null
+}
+
 export function detectUserMode(text: string): 'bank' | 'investor' | null {
   const lower = text.toLowerCase()
   if (/\b(switch to|use|act as an?)\s+investor\b|\binvestor (mode|view|lens)\b/.test(lower)) return 'investor'

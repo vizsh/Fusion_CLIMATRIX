@@ -30,6 +30,7 @@ import {
   answerInstitution,
   answerMethodology,
   answerPortfolio,
+  answerReverseStressTest,
   answerRunSimulation,
   answerSetScenario,
   answerUnmappedCity,
@@ -47,6 +48,7 @@ import {
   detectRegions,
   detectSeverity,
   detectSubstitutability,
+  detectTargetLossCr,
   detectUnmappedCity,
   detectUserMode,
   resolveScenario,
@@ -94,6 +96,10 @@ const RULES: { test: (t: string) => boolean; handler: (ctx: Ctx, t: string) => C
   {
     test: (t) => /how (is|are|does)\b.*\b(calculat|comput|deriv)|explain the formula|methodolog|what does severity mean/i.test(t),
     handler: () => answerMethodology(),
+  },
+  {
+    test: (t) => /reverse stress|how (severe|bad)|what severity would it take|breach(es|ing)?\b/i.test(t) && detectTargetLossCr(t) !== null,
+    handler: (ctx, t) => answerReverseStressTest(regionOrCurrent(t, ctx), detectTargetLossCr(t)!, paramsFor(t, ctx)),
   },
   {
     test: (t) => (/\bcompar|\bvs\.?\b|\bversus\b|which (region|one) is (worse|riskier|safer|better)/i.test(t)) && detectRegions(t).length >= 2,

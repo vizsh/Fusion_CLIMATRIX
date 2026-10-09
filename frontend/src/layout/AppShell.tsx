@@ -11,6 +11,7 @@ import {
   Play,
   Shield,
   Sparkles,
+  TrendingUp,
   Umbrella,
   Workflow,
 } from 'lucide-react'
@@ -29,6 +30,7 @@ const NAV = [
   { to: '/portfolio', label: 'Portfolio Impact', icon: PieChart },
   { to: '/mitigation', label: 'Mitigation Studio', icon: Shield },
   { to: '/insurance', label: 'Insurance & Protection Gap', icon: Umbrella },
+  { to: '/real-market', label: 'Real Market Sensitivity', icon: TrendingUp },
   { to: '/evidence', label: 'Evidence & Reports', icon: FileCheck2 },
 ]
 

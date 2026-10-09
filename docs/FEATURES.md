@@ -98,6 +98,28 @@ screenshots.
 | Saved scenarios | `localStorage`-backed, `useScenarioStore.savedScenarios` | Real (local only, not shared) |
 | Scenario profiles (Baseline → Compound) | `SCENARIO_PROFILES` | Assumption (disclosed presets) |
 
+## 8a. Real Market Climate Sensitivity (`/real-market`)
+
+| Feature | Implementation | Tag |
+|---|---|---|
+| 18 real, publicly listed Indian companies, ranked by sensitivity index | `lib/realMarketSensitivity.ts` — real names/tickers/sectors | Sourced (identity), Assumption (classification) |
+| Sensitivity direction (exposed/beneficiary/mixed/resilient) | Reuses the sector-vulnerability multiplier mechanic, extended with direction | Assumption, disclosed |
+| Worst-case and favorable-scenario narratives per company | Hand-written, reasoned per sector — e.g. cement/infra majors modeled as reconstruction-demand beneficiaries | Assumption, disclosed |
+| Live real-news search per company | `searchNews()` → backend NewsAPI/GNews connector | Sourced |
+| 0-100 sensitivity index, reactive to the shared severity dial | `computeSensitivityIndex()` — comparative ranking aid, never a financial-loss figure for a real company | Modelled |
+
+## 8b. Reverse Stress Test (Copilot-only — no dedicated page)
+
+| Feature | Implementation | Tag |
+|---|---|---|
+| "What severity would it take to breach ₹X cr" | `lib/reverseStressTest.ts` — binary search over `computeImpact`, valid because stressedEl is monotonic in severity | Modelled |
+| Honest "not reachable" result | Returned instead of guessing when even severity 100 doesn't breach the target at the given duration/substitutability | Modelled |
+
+Identified by reviewing `shreyascoder2006/fusion_earth` (a teammate's separate
+alternate build of this same FIN-04 problem) — its own plan document listed
+"reverse stress testing" as a P2 feature it never built. No new data or
+model was needed — it's a search over the engine that already existed.
+
 ## 9. Evidence & Reports (`/evidence`)
 
 | Feature | Implementation | Tag |

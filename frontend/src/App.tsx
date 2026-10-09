@@ -8,6 +8,7 @@ import EvidenceReportsPage from './pages/EvidenceReportsPage'
 import InsurancePage from './pages/InsurancePage'
 import MitigationStudioPage from './pages/MitigationStudioPage'
 import PortfolioImpactPage from './pages/PortfolioImpactPage'
+import RealMarketSensitivityPage from './pages/RealMarketSensitivityPage'
 import ScenarioLabPage from './pages/ScenarioLabPage'
 import WhatIfAnalysisPage from './pages/WhatIfAnalysisPage'
 
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="portfolio" element={<PortfolioImpactPage />} />
           <Route path="mitigation" element={<MitigationStudioPage />} />
           <Route path="insurance" element={<InsurancePage />} />
+          <Route path="real-market" element={<RealMarketSensitivityPage />} />
           <Route path="evidence" element={<EvidenceReportsPage />} />
         </Route>
       </Routes>

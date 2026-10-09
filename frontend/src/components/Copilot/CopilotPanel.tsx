@@ -14,7 +14,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Mic, MicOff, Radar, Send, Volume2, VolumeX, X } from 'lucide-react'
+import { Maximize2, Mic, MicOff, Minimize2, Radar, Send, Volume2, VolumeX, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useScenarioStore } from '../../store/useScenarioStore'
 import { downloadBrief, downloadPortfolioBrief, generatePortfolioOverview, generateWhatIf } from '../../lib/copilot/engine'
@@ -39,6 +39,10 @@ function nextId() {
 
 export default function CopilotPanel() {
   const [open, setOpen] = useState(false)
+  // Blocks like tables/rankedList/statRow can genuinely need more room than
+  // a 420px-wide docked panel gives them — this is the formatting gap that
+  // showed up as cramped wrapping, not a bug in the blocks themselves.
+  const [expanded, setExpanded] = useState(false)
   const [input, setInput] = useState('')
   const [turns, setTurns] = useState<CopilotTurn[]>([
     {
@@ -180,7 +184,11 @@ export default function CopilotPanel() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 24, scale: 0.97 }}
             transition={{ type: 'spring', stiffness: 320, damping: 28 }}
-            className="fixed bottom-5 right-5 z-40 flex h-[640px] w-[420px] max-h-[85vh] flex-col overflow-hidden rounded-xl border border-line bg-panel/95 shadow-2xl backdrop-blur-xl"
+            className={`fixed z-40 flex flex-col overflow-hidden rounded-xl border border-line bg-panel/95 shadow-2xl backdrop-blur-xl ${
+              expanded
+                ? 'inset-5 h-auto w-auto'
+                : 'bottom-5 right-5 h-[640px] w-[420px] max-h-[85vh]'
+            }`}
           >
             <div className="flex shrink-0 items-center justify-between border-b border-line bg-panel-2/70 px-3.5 py-2.5">
               <div className="flex items-center gap-2">
@@ -218,6 +226,13 @@ export default function CopilotPanel() {
                 >
                   {ollamaReady === null ? 'CHECKING' : ollamaReady ? 'OLLAMA READY' : 'RULES ONLY'}
                 </span>
+                <button
+                  onClick={() => setExpanded((v) => !v)}
+                  title={expanded ? 'Collapse to the docked panel' : 'Expand — tables and comparisons get a lot more room'}
+                  className="rounded p-1 text-slate-500 hover:bg-panel-2 hover:text-slate-200"
+                >
+                  {expanded ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+                </button>
                 <button onClick={() => setOpen(false)} className="rounded p-1 text-slate-500 hover:bg-panel-2 hover:text-slate-200">
                   <X size={15} />
                 </button>

@@ -139,9 +139,23 @@ export default function DigitalTwinPage() {
   }
 
   // Region switch (from the scenario console) re-centers the camera and
-  // reloads that region's real district boundaries.
+  // reloads that region's real district boundaries. The FIRST mount is
+  // deliberately excluded from the fly-to-region behavior: this effect
+  // used to fire on mount too, immediately flying away from the India
+  // overview to whatever region the scenario store already happened to
+  // hold (the active region from a prior session, Presentation Mode, or a
+  // Copilot command) — which is what "opens on a random place instead of
+  // India" actually was. Every fresh navigation to this page now rests on
+  // India first (matching initialViewState below), and only flies to a
+  // region in response to an actual region change after that.
+  const hasMountedRef = useRef(false)
   useEffect(() => {
-    flyTo(CAMERA_PRESETS[region], 'region')
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true
+      flyTo(CAMERA_PRESETS.india, 'india')
+    } else {
+      flyTo(CAMERA_PRESETS[region], 'region')
+    }
     const geoFile = GEO_FILE_BY_REGION[region]
     if (!geoFile) {
       setDistrictData(null)
@@ -172,7 +186,19 @@ export default function DigitalTwinPage() {
 
   // Selecting any entity anywhere in the app (graph, company page, map
   // marker) re-centers the Digital Twin on it, if it has real coordinates.
+  // Same first-mount exclusion as the region effect above, and for the
+  // same reason: selectedEntityId lives in the global store and survives
+  // navigation, so a selection made on a PREVIOUS visit to this page (or
+  // from the Dependency Explorer, Copilot, etc.) was flying the camera
+  // away from India the instant this page mounted, before the user ever
+  // saw the overview — this is the other half of "even on an automated
+  // landing, it doesn't land on India."
+  const hasMountedEntityRef = useRef(false)
   useEffect(() => {
+    if (!hasMountedEntityRef.current) {
+      hasMountedEntityRef.current = true
+      return
+    }
     if (!selectedEntityId) return
     const node = NODES.find((n) => n.id === selectedEntityId)
     if (!node?.coords) return
@@ -207,7 +233,24 @@ export default function DigitalTwinPage() {
       <div className={`relative min-h-0 flex-1 ${styleMode === 'institutional' ? 'map-dark' : ''}`}>
         <GLMap
           ref={mapRef}
-          initialViewState={{ ...CAMERA_PRESETS.india }}
+          // react-map-gl's ViewState wants longitude/latitude as separate
+          // fields — CAMERA_PRESETS stores a `center: [lng, lat]` tuple
+          // (the shape MapLibre's own native flyTo() takes), which this
+          // prop silently doesn't recognize. Spreading the preset directly
+          // here meant the very first paint was never actually India at
+          // all; it fell back to whichever position react-map-gl/MapLibre
+          // defaults to when longitude/latitude are missing — the literal
+          // "opens on some random place instead of India" bug. The
+          // mount-time flyTo() calls above happened to mask this on a slow
+          // enough initial render, which is why it didn't reproduce every
+          // time.
+          initialViewState={{
+            longitude: CAMERA_PRESETS.india.center[0],
+            latitude: CAMERA_PRESETS.india.center[1],
+            zoom: CAMERA_PRESETS.india.zoom,
+            pitch: CAMERA_PRESETS.india.pitch,
+            bearing: CAMERA_PRESETS.india.bearing,
+          }}
           mapStyle={style}
           style={{ width: '100%', height: '100%' }}
           interactiveLayerIds={showDistricts ? ['district-fill'] : []}

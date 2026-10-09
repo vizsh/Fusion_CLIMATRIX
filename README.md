@@ -208,6 +208,23 @@ the "why does this matter" case is made before any dial is touched.
   anomalous happened with the weather here" calls the live scikit-learn
   anomaly detector; "search news about X" calls the live TF-IDF semantic
   search — the Copilot isn't frontend-only.
+- **Reverse stress testing** — "what severity would it take to breach ₹500
+  cr in losses" runs a real binary search over the same engine (not a
+  lookup table), and honestly reports when a target isn't reachable at the
+  current duration/substitutability instead of guessing.
+
+### Real Market Climate Sensitivity — real companies, disclosed framework
+A separate lens from the synthetic portfolio: 18 real, publicly listed
+Indian companies (Taj/Indian Hotels, Adani Green, L&T, UltraTech Cement,
+ICICI Lombard, ONGC, TCS, Sun Pharma and more) classified by climate
+sensitivity **direction** — `exposed`, `beneficiary`, `mixed`, or
+`resilient` — not every climate story is a liability; reconstruction
+demand for cement/infrastructure majors and policy tailwinds for
+renewables are modeled as real upside, not smoothed away. Click any
+company for its worst-case scenario, how it could favor them, and a
+**live real-news search** via the backend's NewsAPI/GNews connector.
+Clearly disclosed as this prototype's own illustrative framework — never
+a sourced ESG rating or investment advice.
 
 ### Scenario engine (shared by every view above)
 - One Zustand store (`useScenarioStore`) is the single source of truth for
@@ -263,7 +280,7 @@ flowchart LR
         Graph["indiaGraphData.ts\n60 nodes · 95 edges"]
         Store["useScenarioStore\n(Zustand) — single source of truth"]
         Engine["Financial engine\nstressPdLgd · computeImpact\ncomputeEquityImpact · insurance.ts"]
-        Pages["9 pages: Command Centre, Digital Twin,\nDependency Explorer, Portfolio Impact,\nMitigation Studio, Insurance & Protection Gap,\nCompany Investigation, Scenario Lab, Evidence & Reports"]
+        Pages["11 pages: Command Centre, Digital Twin,\nDependency Explorer, Portfolio Impact,\nMitigation Studio, Insurance & Protection Gap,\nReal Market Sensitivity, Company Investigation,\nScenario Lab, What-If Analysis, Evidence & Reports"]
         Graph --> Store
         Store --> Engine
         Engine --> Pages
