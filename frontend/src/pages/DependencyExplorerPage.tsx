@@ -9,10 +9,11 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 
-import { AlertTriangle, Flame, Network, Search, ShieldAlert } from 'lucide-react'
+import { AlertTriangle, Flame, Network, Search, ShieldAlert, SlidersHorizontal } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import EntityInspector from '../components/graph/EntityInspector'
 import PageHeader from '../components/PageHeader'
+import ScenarioConsole from '../components/ScenarioConsole'
 import { layoutGraph } from '../lib/dagreLayout'
 import { EVIDENCE_META } from '../lib/evidence'
 import {
@@ -23,7 +24,7 @@ import {
 } from '../lib/graphAnalytics'
 import { EDGES, KIND_META, NODES, type GNode } from '../lib/indiaGraphData'
 import GraphNode from '../components/graph/GraphNode'
-import { useScenarioStore } from '../store/useScenarioStore'
+import { type Region, useScenarioStore } from '../store/useScenarioStore'
 
 const NODE_TYPES = { ind: GraphNode }
 const BASE_LAYOUT = layoutGraph(NODES, EDGES)
@@ -35,7 +36,10 @@ const HAZARDS = NODES.filter((n) => n.kind === 'hazard')
 export default function DependencyExplorerPage() {
   const selectedId = useScenarioStore((s) => s.selectedEntityId)
   const setSelectedId = useScenarioStore((s) => s.setSelectedEntity)
+  const setRegion = useScenarioStore((s) => s.setRegion)
+  const activeRegion = useScenarioStore((s) => s.region)
   const [query, setQuery] = useState('')
+  const [showConsole, setShowConsole] = useState(true)
 
   const chain = useMemo(() => (selectedId ? getConnectedChain(selectedId) : null), [selectedId])
 
@@ -85,6 +89,24 @@ export default function DependencyExplorerPage() {
         tag={`${NODES.length} NODES · ${EDGES.length} EDGES · ₹${TOTAL_EAD} CR PORTFOLIO`}
       />
 
+      <div className="border-b border-line bg-panel/40">
+        <button
+          onClick={() => setShowConsole((v) => !v)}
+          className="flex w-full items-center gap-1.5 px-3 py-1.5 font-mono text-[9.5px] tracking-[0.15em] text-slate-500 hover:text-slate-300"
+        >
+          <SlidersHorizontal size={11} className="text-cyan" />
+          BUILD A SCENARIO {showConsole ? '▾' : '▸'}
+          <span className="ml-auto font-normal normal-case tracking-normal text-slate-600">
+            Set a region, hazard and severity, then select or search any company, bank or asset to see how this scenario affects it.
+          </span>
+        </button>
+        {showConsole && (
+          <div className="border-t border-line-soft px-1 pb-1">
+            <ScenarioConsole compact />
+          </div>
+        )}
+      </div>
+
       <div className="flex min-h-0 flex-1">
         <aside className="flex w-[260px] shrink-0 flex-col gap-4 overflow-y-auto border-r border-line bg-panel/60 p-3">
           <div>
@@ -94,9 +116,34 @@ export default function DependencyExplorerPage() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Company, bank, supplier…"
+              placeholder="e.g. Union Pradesh Bank…"
               className="w-full rounded border border-line bg-panel-2 px-2.5 py-1.5 text-[11px] text-slate-300 placeholder:text-slate-600 focus:border-cyan/50 focus:outline-none"
             />
+            {query.trim() && matchedIds && (
+              <div className="mt-1.5 max-h-[160px] space-y-1 overflow-y-auto rounded border border-line bg-panel-2 p-1.5">
+                {NODES.filter((n) => matchedIds.has(n.id)).length === 0 && (
+                  <div className="px-1.5 py-1 text-[10.5px] text-slate-600">No matches</div>
+                )}
+                {NODES.filter((n) => matchedIds.has(n.id))
+                  .slice(0, 12)
+                  .map((n) => {
+                    const meta = KIND_META[n.kind]
+                    return (
+                      <button
+                        key={n.id}
+                        onClick={() => {
+                          setSelectedId(n.id)
+                          setQuery('')
+                        }}
+                        className="flex w-full items-center gap-1.5 rounded px-1.5 py-1 text-left text-[10.5px] text-slate-300 hover:bg-panel"
+                      >
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: meta.color }} />
+                        <span className="truncate">{n.label}</span>
+                      </button>
+                    )
+                  })}
+              </div>
+            )}
           </div>
 
           <div>
@@ -107,15 +154,21 @@ export default function DependencyExplorerPage() {
               {HAZARDS.map((h) => (
                 <button
                   key={h.id}
-                  onClick={() => setSelectedId(selectedId === h.id ? null : h.id)}
+                  onClick={() => {
+                    if (h.region) setRegion(h.region as Region)
+                    setSelectedId(selectedId === h.id ? null : h.id)
+                  }}
                   className={`w-full rounded border px-2 py-1.5 text-left text-[10.5px] transition-colors ${
-                    selectedId === h.id ? 'border-risk-high/50 bg-risk-high/10 text-risk-high' : 'border-line text-slate-400 hover:border-slate-600'
+                    activeRegion === h.region ? 'border-risk-high/50 bg-risk-high/10 text-risk-high' : 'border-line text-slate-400 hover:border-slate-600'
                   }`}
                 >
                   {h.label}
                 </button>
               ))}
             </div>
+            <p className="mt-1.5 text-[9.5px] leading-relaxed text-slate-600">
+              Selecting a hazard also sets it as the active scenario region.
+            </p>
           </div>
 
           <div>
@@ -186,8 +239,9 @@ export default function DependencyExplorerPage() {
           ) : (
             <div className="border-b border-line p-4 text-[11px] leading-relaxed text-slate-500">
               <Network size={14} className="mb-2 text-cyan" />
-              Click any node to trace its full upstream and downstream chain, or seed a hazard on
-              the left to see everything it can financially reach.
+              Build a scenario above, then search or click any node — e.g. set region to Himachal
+              Pradesh and search "Union Pradesh Bank" to see exactly which of its borrowers that
+              scenario would hit, and by how much.
             </div>
           )}
 

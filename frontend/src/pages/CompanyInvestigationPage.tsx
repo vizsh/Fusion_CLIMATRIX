@@ -13,8 +13,8 @@ import {
 import { useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
-import { directFinanciers, getAncestors } from '../lib/graphAnalytics'
-import { EDGES, NODES, type GNode } from '../lib/indiaGraphData'
+import { companyExposureDetail, directFinanciers } from '../lib/graphAnalytics'
+import { NODES, type GNode } from '../lib/indiaGraphData'
 import { INTERVENTIONS } from '../lib/interventions'
 import { sectorVulnerability } from '../lib/sectorVulnerability'
 import { computeEquityImpact, REGION_LABEL, stressPdLgd, useScenarioStore } from '../store/useScenarioStore'
@@ -23,14 +23,14 @@ const COMPANIES = NODES.filter((n) => n.kind === 'company')
 
 function dueDiligenceQuestions(
   hazards: GNode[],
-  infra: GNode[],
+  directInfra: GNode[],
   suppliers: GNode[],
   directInfraParent: boolean,
   financiers: GNode[],
 ) {
   const qs: string[] = []
   if (directInfraParent && hazards.length) {
-    qs.push(`Request an independent hazard/engineering assessment for ${infra.map((i) => i.label).join(' and ')}, the direct physical dependency for this site.`)
+    qs.push(`Request an independent hazard/engineering assessment for ${directInfra.map((i) => i.label).join(' and ')}, the direct physical dependency for this site.`)
   }
   if (hazards.length && !directInfraParent) {
     qs.push('Verify the indirect exposure path: confirm which infrastructure or supplier failure would actually interrupt operations, rather than assuming proximity alone is a risk.')
@@ -38,8 +38,8 @@ function dueDiligenceQuestions(
   if (suppliers.length === 1) {
     qs.push(`${suppliers[0].label} appears to be a single-sourced dependency — confirm whether a qualified alternate supplier exists.`)
   }
-  if (infra.length === 1) {
-    qs.push(`${infra[0].label} appears to be the sole access/utility dependency traced in the graph — verify whether an alternate route or backup exists.`)
+  if (directInfra.length === 1) {
+    qs.push(`${directInfra[0].label} appears to be the sole direct access/utility dependency traced in the graph — verify whether an alternate route or backup exists.`)
   }
   if (!financiers.length) {
     qs.push('No financing relationship is captured for this company — confirm lender of record before relying on any credit-side conclusion.')
@@ -63,18 +63,12 @@ export default function CompanyInvestigationPage() {
 
   const company = COMPANIES.find((c) => c.id === selectedId) ?? COMPANIES[0]
 
-  const { nodes: ancestorIds } = getAncestors(company.id)
-  const hazards = NODES.filter((n) => n.kind === 'hazard' && ancestorIds.has(n.id))
-  const infra = NODES.filter((n) => n.kind === 'infra' && ancestorIds.has(n.id))
-  const suppliers = NODES.filter((n) => n.kind === 'supplier' && ancestorIds.has(n.id))
-  const directInfraParent = EDGES.some(
-    (e) => e.to === company.id && NODES.find((n) => n.id === e.from)?.kind === 'infra',
-  )
+  const { hazards, directInfra, indirectInfra, suppliers, directInfraParent } = companyExposureDetail(company.id)
   const financiers = directFinanciers(company.id)
   const relevantScenario = hazards.some((h) => h.region === scenario.region)
   const questions = useMemo(
-    () => dueDiligenceQuestions(hazards, infra, suppliers, directInfraParent, financiers),
-    [hazards, infra, suppliers, directInfraParent, financiers],
+    () => dueDiligenceQuestions(hazards, directInfra, suppliers, directInfraParent, financiers),
+    [hazards, directInfra, suppliers, directInfraParent, financiers],
   )
   const candidateMitigations = INTERVENTIONS.filter((i) =>
     suppliers.length ? true : i.id !== 'supplier-diversification',
@@ -104,7 +98,8 @@ export default function CompanyInvestigationPage() {
       '',
       '— EXPOSURE —',
       `Hazard ancestors: ${hazards.length} (${directInfraParent ? 'direct infrastructure dependency' : 'indirect'})`,
-      `Infrastructure dependencies: ${infra.map((i) => i.label).join(', ') || 'none traced'}`,
+      `Direct infrastructure dependency: ${directInfra.map((i) => i.label).join(', ') || 'none traced'}`,
+      `Indirect infrastructure (via supplier): ${indirectInfra.map((i) => i.label).join(', ') || 'none traced'}`,
       `Supplier dependencies: ${suppliers.map((s) => s.label).join(', ') || 'none traced'}`,
       '',
       userMode === 'bank'
@@ -188,9 +183,12 @@ export default function CompanyInvestigationPage() {
             <div className="mt-6 space-y-4">
               <Block icon={MapPin} title="Facility and geographic exposure">
                 {company.label} operates in {company.region === 'National' ? 'a diversified national footprint' : company.region}.{' '}
-                {infra.length
-                  ? `Its dependency chain traces back through ${infra.map((i) => i.label).join(', ')}.`
-                  : 'No infrastructure dependency is currently traced to this company in the graph.'}
+                {directInfra.length
+                  ? `Directly dependent on ${directInfra.map((i) => i.label).join(', ')}.`
+                  : 'No direct infrastructure dependency is traced to this company in the graph.'}
+                {indirectInfra.length
+                  ? ` Also indirectly linked, via a shared supplier, to ${indirectInfra.map((i) => i.label).join(', ')} — a real but more distant dependency, not a direct site risk.`
+                  : ''}
               </Block>
 
               <Block icon={GitBranch} title="Supply-chain exposure and substitutability">

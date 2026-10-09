@@ -213,3 +213,58 @@ export function directFinanciers(nodeId: string) {
     .map((e) => nodeById.get(e.to))
     .filter((n): n is GNode => !!n)
 }
+
+export interface CompanyExposureDetail {
+  hazards: GNode[]
+  /** Infrastructure with a direct (one-hop) edge into this company. */
+  directInfra: GNode[]
+  /** Infrastructure reached only via a supplier or a shared multi-region
+   * node (e.g. a national logistics supplier) — real graph ancestors, but
+   * not a direct operational dependency, so kept visually separate to
+   * avoid implying a Himachal company directly depends on a Kerala port. */
+  indirectInfra: GNode[]
+  suppliers: GNode[]
+  directInfraParent: boolean
+}
+
+/** A company's upstream exposure structure — which hazards, infrastructure
+ * and suppliers sit in its ancestor chain, with direct vs indirect
+ * infrastructure dependency kept distinct. */
+export function companyExposureDetail(companyId: string): CompanyExposureDetail {
+  const { nodes: ancestorIds } = getAncestors(companyId)
+  const hazards = NODES.filter((n) => n.kind === 'hazard' && ancestorIds.has(n.id))
+  const allInfra = NODES.filter((n) => n.kind === 'infra' && ancestorIds.has(n.id))
+  const suppliers = NODES.filter((n) => n.kind === 'supplier' && ancestorIds.has(n.id))
+  const directInfraIds = new Set(
+    EDGES.filter((e) => e.to === companyId && nodeById.get(e.from)?.kind === 'infra').map((e) => e.from),
+  )
+  const directInfra = allInfra.filter((n) => directInfraIds.has(n.id))
+  const indirectInfra = allInfra.filter((n) => !directInfraIds.has(n.id))
+  return { hazards, directInfra, indirectInfra, suppliers, directInfraParent: directInfra.length > 0 }
+}
+
+export interface InstitutionScenarioExposure {
+  totalBorrowers: GNode[]
+  exposedBorrowers: GNode[]
+  unexposedBorrowers: GNode[]
+  totalEAD: number
+  exposedEAD: number
+}
+
+/** The question "how would [this hazard] affect [this bank]?" answered
+ * structurally: intersect everything financing this institution with
+ * everything reachable from the given hazard. */
+export function institutionExposureToHazard(institutionId: string, hazardId: string): InstitutionScenarioExposure {
+  const { nodes: borrowerAncestorIds } = getAncestors(institutionId)
+  const totalBorrowers = ALL_COMPANIES.filter((c) => borrowerAncestorIds.has(c.id))
+  const { nodes: hazardDescendantIds } = getDescendants(hazardId)
+  const exposedBorrowers = totalBorrowers.filter((c) => hazardDescendantIds.has(c.id))
+  const unexposedBorrowers = totalBorrowers.filter((c) => !hazardDescendantIds.has(c.id))
+  return {
+    totalBorrowers,
+    exposedBorrowers,
+    unexposedBorrowers,
+    totalEAD: totalBorrowers.reduce((s, c) => s + (c.eadCr ?? 0), 0),
+    exposedEAD: exposedBorrowers.reduce((s, c) => s + (c.eadCr ?? 0), 0),
+  }
+}
