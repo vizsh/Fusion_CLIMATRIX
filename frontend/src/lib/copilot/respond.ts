@@ -8,7 +8,7 @@
 // docs/ARCHITECTURE.md's evidence-integrity rule).
 
 import { computeBottlenecks, institutionExposureToHazard, REGION_HAZARD } from '../graphAnalytics'
-import { computeInsurerBook, computeProtectionGap, allInsurers } from '../insurance'
+import { computeInsurerBook, computeProtectionGap, allInsurers, formatLossRatio } from '../insurance'
 import { NODES } from '../indiaGraphData'
 import { WEATHER_WINDOWS } from '../weatherWindows'
 import {
@@ -265,7 +265,7 @@ function handleInsurance(ctx: Ctx, text: string): CopilotBlock[] {
       kind: 'bullets',
       items: [
         `Uninsured exposed, ranked by EAD: ${gap.uninsuredExposed.slice(0, 5).map((c) => c.label).join(', ') || 'none traced'}.`,
-        ...insurerRows.map((b) => `${b.insurer.label}: gross loss ratio ${(b.grossLossRatio * 100).toFixed(0)}%, cedes ${b.cededSharePct}% to reinsurance.`),
+        ...insurerRows.map((b) => `${b.insurer.label}: gross loss ratio ${formatLossRatio(b.grossLossRatio)}, cedes ${b.cededSharePct}% to reinsurance.`),
       ],
     },
     { kind: 'text', text: 'A policy limit is not an automatic payout — exclusions, deductibles and sublimits change the actual claim, which is why the figures above are modelled estimates, not a guarantee.' },

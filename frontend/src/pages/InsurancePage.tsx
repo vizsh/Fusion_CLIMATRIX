@@ -3,7 +3,7 @@ import PageHeader from '../components/PageHeader'
 import ScenarioConsole from '../components/ScenarioConsole'
 import { REGION_HAZARD } from '../lib/graphAnalytics'
 import { KIND_META } from '../lib/indiaGraphData'
-import { allInsurers, computeInsurerBook, computeProtectionGap } from '../lib/insurance'
+import { allInsurers, computeInsurerBook, computeProtectionGap, formatLossRatio } from '../lib/insurance'
 import { REGION_LABEL, useScenarioStore } from '../store/useScenarioStore'
 
 function Card({ label, value, color, note }: { label: string; value: string; color?: string; note?: string }) {
@@ -53,7 +53,7 @@ export default function InsurancePage() {
             label="EXPECTED NET CLAIMS — SCENARIO"
             value={`₹${gap.totalNetClaimsCr.toFixed(2)} cr`}
             color="#fb3a4a"
-            note={`Modeled loss ratio ${(gap.portfolioLossRatio * 100).toFixed(0)}% against ₹${gap.totalPremiumCr.toFixed(2)} cr premium — a disclosed estimate, not a filed-claims figure.`}
+            note={`Modeled loss ratio ${formatLossRatio(gap.portfolioLossRatio)} against ₹${gap.totalPremiumCr.toFixed(2)} cr premium — a disclosed estimate, not a filed-claims figure.`}
           />
         </div>
 
@@ -91,7 +91,7 @@ export default function InsurancePage() {
                   </div>
                   <div>
                     <div className="text-slate-600">Gross loss ratio</div>
-                    <div className="font-mono-tnum text-risk-med">{(b!.grossLossRatio * 100).toFixed(0)}%</div>
+                    <div className="font-mono-tnum text-risk-med">{formatLossRatio(b!.grossLossRatio)}</div>
                   </div>
                   {b!.govtSubsidyPct > 0 ? (
                     <div>

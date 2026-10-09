@@ -171,6 +171,19 @@ export function allInsurers(): GNode[] {
   return NODES.filter((n) => n.kind === 'insurer')
 }
 
+/** A catastrophic scenario can legitimately produce claims many times a
+ * single year's premium (that's the entire reason catastrophe reinsurance
+ * exists) — a true "4639%" is not a calculation error, but displaying it
+ * as a bare percentage reads as one. Real insurers report a stressed-year
+ * loss ratio like this as a multiple of premium past a sane percentage
+ * range; this is purely a display-formatting fix, not a change to the
+ * underlying claim or premium model. */
+export function formatLossRatio(ratio: number): string {
+  if (!Number.isFinite(ratio) || ratio <= 0) return '0%'
+  if (ratio >= 5) return `${ratio.toFixed(1)}× premium`
+  return `${(ratio * 100).toFixed(0)}%`
+}
+
 export interface InsuranceAdjustedCredit {
   insurer: GNode
   insuranceOffsetCr: number
