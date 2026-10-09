@@ -1,0 +1,29 @@
+import { HashRouter, Route, Routes } from 'react-router-dom'
+import AppShell from './layout/AppShell'
+import CommandCentrePage from './pages/CommandCentrePage'
+import CompanyInvestigationPage from './pages/CompanyInvestigationPage'
+import DependencyExplorerPage from './pages/DependencyExplorerPage'
+import DigitalTwinPage from './pages/DigitalTwinPage'
+import EvidenceReportsPage from './pages/EvidenceReportsPage'
+import MitigationStudioPage from './pages/MitigationStudioPage'
+import PortfolioImpactPage from './pages/PortfolioImpactPage'
+import ScenarioLabPage from './pages/ScenarioLabPage'
+
+export default function App() {
+  return (
+    <HashRouter>
+      <Routes>
+        <Route element={<AppShell />}>
+          <Route index element={<CommandCentrePage />} />
+          <Route path="twin" element={<DigitalTwinPage />} />
+          <Route path="scenario" element={<ScenarioLabPage />} />
+          <Route path="dependency" element={<DependencyExplorerPage />} />
+          <Route path="company" element={<CompanyInvestigationPage />} />
+          <Route path="portfolio" element={<PortfolioImpactPage />} />
+          <Route path="mitigation" element={<MitigationStudioPage />} />
+          <Route path="evidence" element={<EvidenceReportsPage />} />
+        </Route>
+      </Routes>
+    </HashRouter>
+  )
+}

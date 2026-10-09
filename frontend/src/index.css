@@ -1,0 +1,96 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+
+  --color-base: #05070a;
+  --color-panel: #0b0e14;
+  --color-panel-2: #10141c;
+  --color-line: #1c2430;
+  --color-line-soft: #141a24;
+
+  --color-cyan: #22d3ee;
+  --color-cyan-dim: #0e7490;
+  --color-risk-high: #fb3a4a;
+  --color-risk-med: #f5a524;
+  --color-risk-low: #2dd4a7;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: var(--color-base);
+  color: #cbd5e1;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: #1c2430;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.font-mono-tnum {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.bg-grid {
+  background-image:
+    linear-gradient(to right, rgba(34, 211, 238, 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(34, 211, 238, 0.045) 1px, transparent 1px);
+  background-size: 42px 42px;
+}
+
+.text-glow {
+  text-shadow: 0 0 18px currentColor;
+}
+
+@keyframes scanline {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+.animate-scanline {
+  animation: scanline 6s linear infinite;
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 2s cubic-bezier(0.2, 0.6, 0.4, 1) infinite;
+}
+
+/* Dark-theme the OSM raster tiles without touching marker/popup overlays,
+   which live as DOM siblings inside the same maplibre container. */
+.map-dark .maplibregl-canvas {
+  filter: invert(1) hue-rotate(180deg) brightness(0.85) saturate(0.35) contrast(0.95);
+}
