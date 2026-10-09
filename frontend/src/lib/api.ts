@@ -183,12 +183,13 @@ export function checkHealth() {
 }
 
 export function getCopilotStatus() {
-  return request<{ configured: boolean }>('/api/copilot/status', undefined, 4000)
+  return request<{ available: boolean; model: string | null; models: string[] }>('/api/copilot/status', undefined, 5000)
 }
 
-// Deliberately untyped pass-through — this mirrors Anthropic's Messages
-// API request/response shape exactly (see backend/app/api/copilot.py),
-// and copilot/llmClient.ts owns interpreting the content blocks.
-export function postCopilotChat(body: { system: string; messages: unknown[]; tools?: unknown[]; max_tokens?: number }) {
-  return request<any>('/api/copilot/chat', { method: 'POST', body: JSON.stringify(body) }, 45000)
+// Deliberately untyped pass-through — this mirrors Ollama's /api/chat
+// request/response shape (see backend/app/api/copilot.py), and
+// copilot/ollamaClient.ts owns interpreting the message content. 90s
+// timeout to tolerate a cold local model load on a CPU-only machine.
+export function postCopilotClassify(body: { model: string; prompt: string; schema: unknown; max_tokens?: number }) {
+  return request<any>('/api/copilot/classify', { method: 'POST', body: JSON.stringify(body) }, 90000)
 }

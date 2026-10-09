@@ -408,11 +408,44 @@ export function answerInstitution(institutionId: string, region: Region): Copilo
   ]
 }
 
+// Matching on a bare first word ("Bank of Bharat" -> "bank") used to
+// false-match anything containing the English word "bank" — including
+// "river banks". Require a whole-word hit on a token that's actually
+// distinctive to this institution's name instead.
+const INSTITUTION_GENERIC_WORDS = new Set([
+  'bank',
+  'banks',
+  'fund',
+  'funds',
+  'finance',
+  'insurance',
+  'national',
+  'state',
+  'public',
+  'sector',
+  'general',
+  'india',
+  'company',
+  'co',
+  'govt',
+  'government',
+  'of',
+  'and',
+  'the',
+])
+
 export function findInstitutionByName(query: string) {
   const lower = query.toLowerCase()
-  return (
-    NODES.find((n) => (n.kind === 'bank' || n.kind === 'insurer' || n.kind === 'govt') && lower.includes(n.label.toLowerCase().split(' ')[0])) ?? null
-  )
+  for (const n of NODES) {
+    if (n.kind !== 'bank' && n.kind !== 'insurer' && n.kind !== 'govt') continue
+    const words = n.label
+      .toLowerCase()
+      .replace(/[—–-]/g, ' ')
+      .split(/\s+/)
+      .filter((w) => w.length >= 4 && !INSTITUTION_GENERIC_WORDS.has(w))
+    if (words.some((w) => new RegExp(`\\b${w}\\b`).test(lower))) return n
+  }
+  return null
 }
 
 export function answerHelp(): CopilotBlock[] {

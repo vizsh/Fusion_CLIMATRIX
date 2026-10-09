@@ -5,22 +5,29 @@
 // chatbot. They should never maintain separate calculations or
 // conflicting results." Every figure it shows comes from respond.ts
 // calling the exact same engine the dashboard pages call.
+//
+// Understanding: precise rules first (free, instant), a local Ollama
+// model as a fallback intent classifier only when needed (see
+// lib/copilot/respond.ts + ollamaClient.ts) — mirroring
+// github.com/vizsh/Jarvis_Hedge_Fund's assistant architecture. Voice
+// input/output are both OFF by default; text is the primary mode.
 
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Radar, Send, Sparkles, X } from 'lucide-react'
+import { Mic, MicOff, Radar, Send, Volume2, VolumeX, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useScenarioStore } from '../../store/useScenarioStore'
 import { downloadBrief, downloadPortfolioBrief, generatePortfolioOverview, generateWhatIf } from '../../lib/copilot/engine'
-import { isLLMAvailable, runAgentTurn, type AnthropicMessage } from '../../lib/copilot/llmClient'
+import { ollamaStatus, warmUpOllama } from '../../lib/copilot/ollamaClient'
 import { respondTo } from '../../lib/copilot/respond'
 import type { CopilotAction, CopilotTurn } from '../../lib/copilot/types'
+import { isVoiceInputSupported, isVoiceOutputSupported, speak, speechFromBlocks, startListening, stopSpeaking } from '../../lib/copilot/voice'
 import { CopilotBlockView } from './CopilotBlocks'
 
 const SUGGESTIONS = [
   'Analyse my portfolio and give me the risks',
   "What if there's a severe flood in Mumbai?",
-  'Guide me to the map and show live movement',
+  'Guide me through this app',
   'Which exposures may be uninsured?',
 ]
 
@@ -41,25 +48,30 @@ export default function CopilotPanel() {
         { kind: 'heading', text: 'CLIMATRIX AI Copilot' },
         {
           kind: 'text',
-          text: "Ask me to analyse your whole portfolio, run a what-if scenario anywhere in the graph, check insurance or compliance, or guide you to the live map. I read and operate the same live scenario state as the dashboard — nothing I say will disagree with what's on screen, and I never invent a number.",
+          text: "Ask me to analyse your whole portfolio, run a what-if scenario anywhere in the graph, check insurance or compliance, or guide you through the app. I read and operate the same live scenario state as the dashboard — nothing I say will disagree with what's on screen, and I never invent a number.",
         },
       ],
     },
   ])
-  const [llmReady, setLlmReady] = useState<boolean | null>(null)
+  const [ollamaReady, setOllamaReady] = useState<boolean | null>(null)
   const [thinking, setThinking] = useState(false)
-  const historyRef = useRef<AnthropicMessage[]>([])
+  const [listening, setListening] = useState(false)
+  const [voiceOut, setVoiceOut] = useState(false) // opt-in, off by default
+  const stopListenRef = useRef<() => void>(() => {})
   const scrollRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const state = useScenarioStore()
 
   useEffect(() => {
-    isLLMAvailable().then(setLlmReady)
+    ollamaStatus().then((s) => setOllamaReady(s.available))
+    warmUpOllama()
   }, [])
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [turns, open, thinking])
+
+  useEffect(() => stopSpeaking, []) // never leave speech running after unmount
 
   function applyDials(action: CopilotAction) {
     if (action.region) state.setRegion(action.region)
@@ -106,39 +118,36 @@ export default function CopilotPanel() {
     const text = (raw ?? input).trim()
     if (!text || thinking) return
     setInput('')
-    const userTurn: CopilotTurn = { id: nextId(), role: 'user', text }
-    setTurns((prev) => [...prev, userTurn])
+    setTurns((prev) => [...prev, { id: nextId(), role: 'user', text }])
+    setThinking(true)
+    try {
+      const reply = await respondTo(text, state)
+      setTurns((prev) => [...prev, { id: nextId(), role: 'assistant', blocks: reply.blocks }])
+      if (voiceOut) speak(speechFromBlocks(reply.blocks))
+    } finally {
+      setThinking(false)
+    }
+  }
 
-    if (llmReady) {
-      setThinking(true)
-      try {
-        const result = await runAgentTurn(text, state, historyRef.current)
-        historyRef.current = result.history
-        setTurns((prev) => [...prev, { id: nextId(), role: 'assistant', blocks: result.blocks }])
-      } catch {
-        // Backend unreachable or the request failed mid-flight — fall back
-        // to the rule-based parser for just this message rather than
-        // leaving the user with no answer, and flag the degraded mode.
-        const reply = respondTo(text, state)
-        setTurns((prev) => [
-          ...prev,
-          {
-            id: nextId(),
-            role: 'assistant',
-            blocks: [
-              { kind: 'text', text: '(The AI understanding service is unreachable right now — answering with the rule-based fallback instead.)' },
-              ...reply.blocks,
-            ],
-          },
-        ])
-      } finally {
-        setThinking(false)
-      }
+  function toggleListening() {
+    if (listening) {
+      stopListenRef.current()
+      setListening(false)
       return
     }
+    setListening(true)
+    stopListenRef.current = startListening(
+      (transcript) => {
+        setInput(transcript)
+        send(transcript)
+      },
+      () => setListening(false),
+    )
+  }
 
-    const reply = respondTo(text, state)
-    setTurns((prev) => [...prev, { id: nextId(), role: 'assistant', blocks: reply.blocks }])
+  function toggleVoiceOut() {
+    if (voiceOut) stopSpeaking()
+    setVoiceOut((v) => !v)
   }
 
   return (
@@ -180,26 +189,34 @@ export default function CopilotPanel() {
                 </div>
                 <div>
                   <div className="font-mono text-[11px] font-semibold tracking-wide text-white">CLIMATRIX COPILOT</div>
-                  <div className="font-mono text-[8.5px] tracking-wide text-slate-500">TOOL-USING · SAME ENGINE AS DASHBOARD</div>
+                  <div className="font-mono text-[8.5px] tracking-wide text-slate-500">RULES + LOCAL OLLAMA · SAME ENGINE AS DASHBOARD</div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
+                {isVoiceOutputSupported() && (
+                  <button
+                    onClick={toggleVoiceOut}
+                    title={voiceOut ? 'Voice output on — click to mute' : 'Voice output off (default) — click to let the Copilot speak replies'}
+                    className={`flex h-6 w-6 items-center justify-center rounded border ${voiceOut ? 'border-cyan/40 bg-cyan/10 text-cyan' : 'border-line text-slate-500 hover:text-slate-300'}`}
+                  >
+                    {voiceOut ? <Volume2 size={12} /> : <VolumeX size={12} />}
+                  </button>
+                )}
                 <span
                   title={
-                    llmReady
-                      ? 'Genuine language understanding via Claude tool-use — numbers still come from the dashboard engine, never the model.'
-                      : 'Rule-based keyword fallback — set ANTHROPIC_API_KEY in backend/.env for full language understanding.'
+                    ollamaReady
+                      ? 'Local Ollama model available as a fallback for messages the rules alone can’t confidently parse. Numbers always come from the dashboard engine, never the model.'
+                      : 'Ollama not reachable — running on rules alone. Install Ollama and pull a model (see backend/.env.example) for broader paraphrase understanding.'
                   }
                   className={`flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[8.5px] tracking-wide ${
-                    llmReady === null
+                    ollamaReady === null
                       ? 'border-line text-slate-600'
-                      : llmReady
+                      : ollamaReady
                         ? 'border-cyan/40 bg-cyan/10 text-cyan'
                         : 'border-risk-med/40 bg-risk-med/10 text-risk-med'
                   }`}
                 >
-                  <Sparkles size={9} />
-                  {llmReady === null ? 'CHECKING' : llmReady ? 'AI UNDERSTANDING' : 'RULE-BASED'}
+                  {ollamaReady === null ? 'CHECKING' : ollamaReady ? 'OLLAMA READY' : 'RULES ONLY'}
                 </span>
                 <button onClick={() => setOpen(false)} className="rounded p-1 text-slate-500 hover:bg-panel-2 hover:text-slate-200">
                   <X size={15} />
@@ -257,11 +274,23 @@ export default function CopilotPanel() {
               }}
               className="flex shrink-0 items-center gap-2 border-t border-line bg-panel-2/40 px-3 py-2.5"
             >
+              {isVoiceInputSupported() && (
+                <button
+                  type="button"
+                  onClick={toggleListening}
+                  title={listening ? 'Stop listening' : 'Voice input (off by default) — click to speak your question'}
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded border ${
+                    listening ? 'border-risk-high/50 bg-risk-high/10 text-risk-high' : 'border-line text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  {listening ? <MicOff size={13} /> : <Mic size={13} />}
+                </button>
+              )}
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 disabled={thinking}
-                placeholder={thinking ? 'Thinking…' : 'Ask about exposure, scenarios, insurance…'}
+                placeholder={thinking ? 'Thinking…' : listening ? 'Listening…' : 'Ask about exposure, scenarios, insurance…'}
                 className="flex-1 bg-transparent text-[12.5px] text-slate-200 placeholder:text-slate-500 focus:outline-none disabled:opacity-50"
               />
               <button

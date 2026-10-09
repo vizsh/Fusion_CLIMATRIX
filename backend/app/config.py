@@ -25,14 +25,17 @@ class Settings(BaseSettings):
     alphai_api_key: str = ""
     alphai_base_url: str = "https://api.alphai.io/api"
 
-    # Powers the AI Copilot's genuine language understanding (intent,
-    # entity extraction, multi-step/compound questions) — see
-    # app/api/copilot.py. The Copilot's NUMBERS never come from this model;
-    # it only decides which deterministic frontend tool to call and phrases
-    # the result. Unset -> the Copilot falls back to its rule-based parser.
-    anthropic_api_key: str = ""
-    anthropic_base_url: str = "https://api.anthropic.com/v1/messages"
-    anthropic_model: str = "claude-sonnet-4-5-20250929"
+    # Powers the AI Copilot's fallback language understanding — a single,
+    # tiny, structured-output call to a LOCAL Ollama model that picks ONE
+    # intent from a closed list (see app/api/copilot.py and
+    # frontend/src/lib/copilot/ollamaClient.ts). It never writes the
+    # answer text and never sees or returns a financial figure; the
+    # precise regex rules in respond.ts run first and handle most
+    # messages for free, with zero model call at all. No API key needed —
+    # Ollama runs locally. Unreachable Ollama -> the Copilot still works,
+    # just with the rules' own (smaller) understanding.
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_model: str = "llama3.1"
 
 
 settings = Settings()

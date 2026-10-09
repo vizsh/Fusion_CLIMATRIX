@@ -1,20 +1,19 @@
-// CLIMATRIX AI Copilot — rule-based fallback parser.
+// CLIMATRIX AI Copilot — the main response path.
 //
-// This path runs when the LLM understanding path (llmClient.ts, backed by
-// a real Claude call with tool-use — see docs comment there) is
-// unavailable: no backend reachable, or ANTHROPIC_API_KEY not configured.
-// It is deliberately a regex/keyword matcher, NOT genuine language
-// understanding — it will miss indirect phrasing, compound questions and
-// anything that doesn't contain one of its trigger words. When the LLM
-// path is available, CopilotPanel.tsx prefers it and only falls back to
-// this parser on error, so the "just matches similar words" behavior only
-// shows up when the Copilot is running without a configured model.
-//
-// Every handler it calls (answers.ts) still goes through the same
-// deterministic engine the dashboard uses — only the PARSING here is
-// unsophisticated, never the numbers.
+// Decision order (mirrors vizsh/Jarvis_Hedge_Fund's backend/assistant.py
+// `detect()`/`aanswer()`):
+//   1. Precise regex rules. Free, instant, trusted — most messages
+//      resolve here with zero model call.
+//   2. A LOCAL Ollama model (ollamaClient.ts) picks ONE intent from a
+//      closed list, ONLY when no rule matched. It never writes the
+//      answer or states a number — it just tells us which deterministic
+//      function in answers.ts to call.
+//   3. If neither is confident, a clarifying answer with suggested
+//      next questions — asking beats guessing.
+// Every number in every path comes from the same engine every dashboard
+// page already uses.
 
-import type { Region, ScenarioState } from '../../store/useScenarioStore'
+import { classifyIntent } from './ollamaClient'
 import {
   answerBrief,
   answerClimateNews,
@@ -32,7 +31,10 @@ import {
   answerWhatIf,
   findInstitutionByName,
 } from './answers'
+import { answerTour } from './tours'
+import { runIntent } from './tools'
 import { detectHorizon, detectRegion, detectUnmappedCity, resolveScenario, type ScenarioParams } from './params'
+import type { Region, ScenarioState } from '../../store/useScenarioStore'
 import type { CopilotBlock } from './types'
 
 interface Ctx {
@@ -52,6 +54,13 @@ function paramsFor(text: string, ctx: Ctx): ScenarioParams {
 }
 
 const RULES: { test: (t: string) => boolean; handler: (ctx: Ctx, t: string) => CopilotBlock[] | null }[] = [
+  {
+    test: (t) =>
+      /guide me through|tour of (this|the) (app|prototype|platform)|show me around|what (can|does) (this|the) (app|prototype)\b.{0,20}\bdo\b|\ball (the )?features\b|\bwalk me through\b/i.test(
+        t,
+      ),
+    handler: () => answerTour(),
+  },
   {
     test: (t) =>
       /guide me to the map|show me the map|take me to (the )?(digital )?twin|open (the )?(digital )?twin|open (the )?map|show (me )?(my )?(investment|portfolio)s?.{0,20}(live|moving|movement)/i.test(
@@ -75,7 +84,7 @@ const RULES: { test: (t: string) => boolean; handler: (ctx: Ctx, t: string) => C
       /\bmy (entire |whole |overall )?portfolio\b|\ball my (investments|holdings)\b|portfolio.?wide|across (my|the) portfolio|overall (portfolio )?risk/i.test(t),
     handler: () => answerPortfolio(),
   },
-  { test: (t) => /insur|protection gap|coverage|underinsured|uninsured/i.test(t), handler: (ctx, t) => answerInsurance(paramsFor(t, ctx)) },
+  { test: (t) => /insur|protection gap|coverage|underinsured|uninsured|\bcovered\b|\b(not|un)covered\b/i.test(t), handler: (ctx, t) => answerInsurance(paramsFor(t, ctx)) },
   {
     test: (t) => /what.?if|worst case|compare scenario|multi.?scenario|automatically test/i.test(t),
     handler: (ctx, t) => answerWhatIf(regionOrCurrent(t, ctx), detectHorizon(t)),
@@ -91,10 +100,37 @@ const RULES: { test: (t: string) => boolean; handler: (ctx: Ctx, t: string) => C
       return inst ? answerInstitution(inst.id, regionOrCurrent(t, ctx)) : null
     },
   },
-  { test: (t) => /expos|vulnerab|risk(y)?\b|holding/i.test(t), handler: (ctx, t) => answerExposure(paramsFor(t, ctx)) },
+  // Deliberately narrower than earlier drafts: a bare "risk" or "holding"
+  // matched almost anything (including insurance/compliance questions
+  // that happen to mention a holding), which is exactly the "matches a
+  // similar word regardless of meaning" failure this Copilot is meant to
+  // avoid. Unmatched messages fall through to the Ollama classifier
+  // instead of a too-eager keyword grab.
+  { test: (t) => /\bexpos(ed|ure)?\b|\bvulnerab\w*\b|\bat risk\b|\bwhich (of my )?(investments|holdings)\b/i.test(t), handler: (ctx, t) => answerExposure(paramsFor(t, ctx)) },
 ]
 
-export function respondTo(message: string, state: ScenarioState): CopilotReply {
+function matchRules(text: string, ctx: Ctx): CopilotBlock[] | null {
+  for (const rule of RULES) {
+    if (rule.test(text)) {
+      const blocks = rule.handler(ctx, text)
+      if (blocks) return blocks
+    }
+  }
+  return null
+}
+
+function clarify(text: string): CopilotBlock[] {
+  return [
+    ...answerHelp(),
+    { kind: 'suggestions', prompts: [text.length > 60 ? text.slice(0, 57) + '...' : text, 'Analyse my portfolio and give me the risks', 'Guide me through this app'] },
+  ]
+}
+
+/** The main entry point. Async because step 2 (the local-model fallback)
+ * is a network call — but step 1 (rules) resolves synchronously in
+ * practice for most messages, so most calls return almost immediately
+ * with zero model involvement. */
+export async function respondTo(message: string, state: ScenarioState): Promise<CopilotReply> {
   const text = message.trim()
   if (!text) return { blocks: answerHelp() }
   if (/^help$|what can you do|^hi$|^hello$/i.test(text)) return { blocks: answerHelp() }
@@ -109,14 +145,20 @@ export function respondTo(message: string, state: ScenarioState): CopilotReply {
     if (unmapped) return { blocks: answerUnmappedCity(unmapped) }
   }
 
-  for (const rule of RULES) {
-    if (rule.test(text)) {
-      const blocks = rule.handler(ctx, text)
-      if (blocks) return { blocks }
-    }
+  const ruleMatch = matchRules(text, ctx)
+  if (ruleMatch) return { blocks: ruleMatch }
+
+  const picked = await classifyIntent(text)
+  if (picked) {
+    // The model decides ONLY the intent; region comes from the regex
+    // alias list (resolveScenario falls back to the active dashboard
+    // region if neither names one) — more reliable than an 8B model's
+    // guess, and cheaper (see ollamaClient.ts).
+    return { blocks: runIntent(picked.intent, { region: detectRegion(text), horizon: detectHorizon(text) }, state) }
   }
-  // Fallback: treat it as an exposure question about whatever region it
-  // mentions (or the active one) — the single most generically useful
-  // answer this unsophisticated parser can give.
-  return { blocks: answerExposure(paramsFor(text, ctx)) }
+
+  // Neither a rule nor the local model was confident — ask rather than
+  // guess, with the clearest fallback (exposure) still offered via
+  // suggestions, not presented as if it answered the question.
+  return { blocks: clarify(text) }
 }
