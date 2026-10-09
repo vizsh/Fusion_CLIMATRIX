@@ -11,6 +11,7 @@ from app.models.entities import (
     OsmWay,
     Portfolio,
     Position,
+    ProposedUpdate,
     ScenarioRun,
     WeatherAnomaly,
     WeatherObservation,
@@ -32,4 +33,5 @@ __all__ = [
     "NewsArticle",
     "NewsEntityLink",
     "OsmWay",
+    "ProposedUpdate",
 ]

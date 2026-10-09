@@ -142,6 +142,33 @@ the "why does this matter" case is made before any dial is touched.
 
 ## Full feature list
 
+### Portfolio Dashboard (`/dashboard`) — the investor/institution landing view
+- A KPI strip (total EAD, climate-exposed value, revenue at risk, ECL,
+  protection gap), physical-vs-transition risk split (`lib/transitionRisk.ts`,
+  a disclosed, independent second axis from physical hazard vulnerability),
+  sector sensitivity-vs-contribution (loss rate vs. share of total portfolio
+  risk, shown together per UNEP FI's TCFD-reporting pattern), a near/medium/
+  long horizon comparison, and derived alerts (`lib/portfolioDashboard.ts`) —
+  computed live from the graph on a common stress scan, explicitly not a
+  persisted or timestamped live-monitoring feed.
+- **Named portfolios**: build a custom subset of holdings (checkbox picker,
+  localStorage-backed, same pattern as saved scenarios) so "my portfolio"
+  scopes every KPI/alert/sector figure to an actual named book instead of
+  implicitly the whole graph.
+
+### Governance & Proposals (`/governance`) — a Griid-pattern assumption queue
+- Propose a change to a disclosed modelling assumption (sector vulnerability,
+  transition sensitivity, a new scenario archetype) with a rationale;
+  a reviewer approves or rejects it. Backend-persisted (`ProposedUpdate`,
+  `app/api/proposals.py`) as the audit trail — approving does not
+  auto-rewrite the targeted constant, a deliberate scope boundary.
+- The Copilot can also **export the active scenario context** (region,
+  dials, key figures, evidence classes) as a text bundle to paste into
+  another AI workspace (`lib/copilot/contextExport.ts`) — both are
+  CLIMATRIX's own implementation of the griid.ai pattern (shared knowledge,
+  reviewed before it becomes institutional memory), built natively with no
+  dependency on Griid's product existing.
+
 ### For a bank / credit risk team
 - Per-borrower expected credit loss, stressed by a transparent, disclosed
   formula — never a bare confidence score (`stressPdLgd` in

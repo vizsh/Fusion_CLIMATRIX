@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import companies, copilot, evidence, infra, institutions, news, portfolios, scenarios, search, weather
+from app.api import companies, copilot, evidence, infra, institutions, news, portfolios, proposals, scenarios, search, weather
 from app.api.companies import assets_router
 from app.config import settings
 from app.logging_config import RequestLoggingMiddleware, configure_logging
@@ -53,6 +53,7 @@ app.include_router(copilot.router)
 app.include_router(search.router)
 app.include_router(assets_router)
 app.include_router(institutions.router)
+app.include_router(proposals.router)
 
 
 @app.get("/api/health")

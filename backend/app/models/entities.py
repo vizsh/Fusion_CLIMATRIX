@@ -367,3 +367,40 @@ class NewsEntityLink(Base):
     created_at: Mapped[datetime] = mapped_column(default=_now)
 
     article: Mapped[NewsArticle] = relationship(back_populates="entity_links")
+
+
+class ProposedUpdate(Base):
+    """Griid-pattern governed assumption queue: a change to a disclosed
+    modelling assumption (a sector's vulnerability multiplier, a new
+    scenario archetype, a transition-sensitivity value — anything an
+    analyst thinks should change) is proposed here with a rationale, not
+    applied live. A reviewer approves or rejects it; only an approved
+    proposal is meant to inform the next edit to the actual constant it
+    targets (frontend lib/sectorVulnerability.ts etc.) — this table is the
+    audit trail and review gate, not a live-config store the app reads at
+    runtime. That's a deliberate scope boundary: turning this into a
+    live-reloaded config system is real future work, not pretended here.
+
+    This is CLIMATRIX's own implementation of the pattern griid.ai
+    describes (shared knowledge + reusable skills, turned into proposed
+    updates a team reviews before they become institutional memory) —
+    built natively, no dependency on Griid's product existing."""
+
+    __tablename__ = "proposed_updates"
+    __table_args__ = (
+        CheckConstraint("kind IN ('sector_vulnerability', 'transition_sensitivity', 'scenario_archetype', 'other')", name="ck_proposal_kind"),
+        CheckConstraint("status IN ('pending', 'approved', 'rejected')", name="ck_proposal_status"),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    kind: Mapped[str] = mapped_column(String)
+    target: Mapped[str] = mapped_column(String)  # e.g. a sector name, or an archetype key
+    current_value: Mapped[str] = mapped_column(String, default="")
+    proposed_value: Mapped[str] = mapped_column(String)
+    rationale: Mapped[str] = mapped_column(Text)
+    proposed_by: Mapped[str] = mapped_column(String, default="")  # free-text name/role — no auth system yet
+    status: Mapped[str] = mapped_column(String, default="pending")
+    reviewer: Mapped[str] = mapped_column(String, default="")
+    review_note: Mapped[str] = mapped_column(String, default="")
+    created_at: Mapped[datetime] = mapped_column(default=_now)
+    reviewed_at: Mapped[datetime | None] = mapped_column(nullable=True)

@@ -314,3 +314,33 @@ class InsiderSummaryResult(BaseModel):
     raw: dict
     source: str = "AlphaAI"
     note: str = "Reference real-market data for a comparable listed company — not connected to any synthetic CLIMATRIX company record."
+
+
+class ProposedUpdateCreateIn(BaseModel):
+    kind: str  # sector_vulnerability | transition_sensitivity | scenario_archetype | other
+    target: str
+    current_value: str = ""
+    proposed_value: str
+    rationale: str
+    proposed_by: str = ""
+
+
+class ProposedUpdateReviewIn(BaseModel):
+    reviewer: str = ""
+    review_note: str = ""
+
+
+class ProposedUpdateOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    kind: str
+    target: str
+    current_value: str
+    proposed_value: str
+    rationale: str
+    proposed_by: str
+    status: str
+    reviewer: str
+    review_note: str
+    created_at: datetime
+    reviewed_at: datetime | None

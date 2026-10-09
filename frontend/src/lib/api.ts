@@ -245,3 +245,41 @@ export function getWeatherAnomalies(lat: number, lng: number, days = 60) {
     25000, // cold-cache NASA POWER fetch + ML scoring can take a few seconds
   )
 }
+
+// --- Governed assumption queue (Griid-pattern proposed updates) ---------
+export interface ProposedUpdate {
+  id: string
+  kind: 'sector_vulnerability' | 'transition_sensitivity' | 'scenario_archetype' | 'other'
+  target: string
+  current_value: string
+  proposed_value: string
+  rationale: string
+  proposed_by: string
+  status: 'pending' | 'approved' | 'rejected'
+  reviewer: string
+  review_note: string
+  created_at: string
+  reviewed_at: string | null
+}
+
+export function listProposals(status?: string) {
+  return request<ProposedUpdate[]>(`/api/proposals${status ? `?status=${status}` : ''}`)
+}
+
+export function createProposal(body: {
+  kind: ProposedUpdate['kind']
+  target: string
+  current_value?: string
+  proposed_value: string
+  rationale: string
+  proposed_by?: string
+}) {
+  return request<ProposedUpdate>('/api/proposals', { method: 'POST', body: JSON.stringify(body) })
+}
+
+export function reviewProposal(id: string, action: 'approve' | 'reject', reviewer: string, reviewNote?: string) {
+  return request<ProposedUpdate>(`/api/proposals/${encodeURIComponent(id)}/${action}`, {
+    method: 'POST',
+    body: JSON.stringify({ reviewer, review_note: reviewNote ?? '' }),
+  })
+}

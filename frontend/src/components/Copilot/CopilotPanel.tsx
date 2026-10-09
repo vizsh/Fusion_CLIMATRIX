@@ -14,9 +14,10 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Maximize2, Mic, MicOff, Minimize2, Radar, Send, Volume2, VolumeX, X } from 'lucide-react'
+import { Maximize2, Mic, MicOff, Minimize2, Radar, Send, Share2, Volume2, VolumeX, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useScenarioStore } from '../../store/useScenarioStore'
+import { downloadContextBundle } from '../../lib/copilot/contextExport'
 import { downloadBrief, downloadPortfolioBrief, generatePortfolioOverview, generateWhatIf } from '../../lib/copilot/engine'
 import { ollamaStatus, warmUpOllama } from '../../lib/copilot/ollamaClient'
 import { respondTo } from '../../lib/copilot/respond'
@@ -201,6 +202,13 @@ export default function CopilotPanel() {
                 </div>
               </div>
               <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => downloadContextBundle(state)}
+                  title="Export the active scenario + evidence as a text bundle you can paste into ChatGPT, Claude, Griid or any other AI workspace (Griid-pattern 'context comes with you')"
+                  className="flex h-6 w-6 items-center justify-center rounded border border-line text-slate-500 hover:text-slate-300"
+                >
+                  <Share2 size={12} />
+                </button>
                 {isVoiceOutputSupported() && (
                   <button
                     onClick={toggleVoiceOut}

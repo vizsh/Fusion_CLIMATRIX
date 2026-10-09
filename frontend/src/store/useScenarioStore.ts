@@ -48,6 +48,14 @@ interface SavedScenario {
   interventions: string[]
 }
 
+export interface SavedPortfolio {
+  id: string
+  name: string
+  /** Company node ids. Empty means "every company" — the implicit default
+   * portfolio before a user has built a custom one. */
+  companyIds: string[]
+}
+
 export interface ScenarioState {
   // --- which financial lens every view renders — forks the analysis, not the data ---
   userMode: UserMode
@@ -77,6 +85,20 @@ export interface ScenarioState {
   // --- saved scenarios (localStorage-backed) ---
   savedScenarios: SavedScenario[]
 
+  // --- named portfolios (localStorage-backed): subsets of holdings the
+  // Portfolio Dashboard and Copilot "my portfolio" questions scope to.
+  // null activePortfolioId means "every holding" (today's behaviour). ---
+  portfolios: SavedPortfolio[]
+  activePortfolioId: string | null
+  createPortfolio: (name: string, companyIds: string[]) => void
+  deletePortfolio: (id: string) => void
+  setActivePortfolio: (id: string | null) => void
+
+  // --- transition-risk policy-stringency dial (independent of the
+  // physical hazard severity dial — see lib/transitionRisk.ts) ---
+  policyStringency: number
+  setPolicyStringency: (v: number) => void
+
   setRegion: (r: Region) => void
   setHazard: (h: Hazard) => void
   setSeverity: (s: number) => void
@@ -104,6 +126,7 @@ export interface ScenarioState {
 }
 
 const SAVE_KEY = 'climatrix.savedScenarios'
+const PORTFOLIOS_KEY = 'climatrix.portfolios'
 
 function loadSaved(): SavedScenario[] {
   try {
@@ -117,6 +140,23 @@ function loadSaved(): SavedScenario[] {
 function persistSaved(list: SavedScenario[]) {
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify(list))
+  } catch {
+    /* ignore quota/availability errors — non-critical */
+  }
+}
+
+function loadPortfolios(): SavedPortfolio[] {
+  try {
+    const raw = localStorage.getItem(PORTFOLIOS_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+function persistPortfolios(list: SavedPortfolio[]) {
+  try {
+    localStorage.setItem(PORTFOLIOS_KEY, JSON.stringify(list))
   } catch {
     /* ignore quota/availability errors — non-critical */
   }
@@ -142,6 +182,24 @@ export const useScenarioStore = create<ScenarioState>((set, get) => ({
   presentationStep: 0,
 
   savedScenarios: loadSaved(),
+
+  portfolios: loadPortfolios(),
+  activePortfolioId: null,
+  createPortfolio: (name, companyIds) => {
+    const entry: SavedPortfolio = { id: `pf-${Date.now()}`, name, companyIds }
+    const list = [entry, ...get().portfolios].slice(0, 20)
+    persistPortfolios(list)
+    set({ portfolios: list, activePortfolioId: entry.id })
+  },
+  deletePortfolio: (id) => {
+    const list = get().portfolios.filter((p) => p.id !== id)
+    persistPortfolios(list)
+    set((s) => ({ portfolios: list, activePortfolioId: s.activePortfolioId === id ? null : s.activePortfolioId }))
+  },
+  setActivePortfolio: (activePortfolioId) => set({ activePortfolioId }),
+
+  policyStringency: 50,
+  setPolicyStringency: (policyStringency) => set({ policyStringency }),
 
   setRegion: (region) =>
     set({ region, hazard: REGION_DEFAULT_HAZARD[region], runState: 'idle', timelineMonth: 0 }),

@@ -5,8 +5,10 @@ import CompanyInvestigationPage from './pages/CompanyInvestigationPage'
 import DependencyExplorerPage from './pages/DependencyExplorerPage'
 import DigitalTwinPage from './pages/DigitalTwinPage'
 import EvidenceReportsPage from './pages/EvidenceReportsPage'
+import GovernancePage from './pages/GovernancePage'
 import InsurancePage from './pages/InsurancePage'
 import MitigationStudioPage from './pages/MitigationStudioPage'
+import PortfolioDashboardPage from './pages/PortfolioDashboardPage'
 import PortfolioImpactPage from './pages/PortfolioImpactPage'
 import RealMarketSensitivityPage from './pages/RealMarketSensitivityPage'
 import ScenarioLabPage from './pages/ScenarioLabPage'
@@ -18,6 +20,7 @@ export default function App() {
       <Routes>
         <Route element={<AppShell />}>
           <Route index element={<CommandCentrePage />} />
+          <Route path="dashboard" element={<PortfolioDashboardPage />} />
           <Route path="twin" element={<DigitalTwinPage />} />
           <Route path="scenario" element={<ScenarioLabPage />} />
           <Route path="what-if" element={<WhatIfAnalysisPage />} />
@@ -28,6 +31,7 @@ export default function App() {
           <Route path="insurance" element={<InsurancePage />} />
           <Route path="real-market" element={<RealMarketSensitivityPage />} />
           <Route path="evidence" element={<EvidenceReportsPage />} />
+          <Route path="governance" element={<GovernancePage />} />
         </Route>
       </Routes>
     </HashRouter>
