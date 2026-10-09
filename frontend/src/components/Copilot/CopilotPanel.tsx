@@ -8,10 +8,11 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Radar, Send, X } from 'lucide-react'
+import { Radar, Send, Sparkles, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useScenarioStore } from '../../store/useScenarioStore'
 import { downloadBrief, downloadPortfolioBrief, generatePortfolioOverview, generateWhatIf } from '../../lib/copilot/engine'
+import { isLLMAvailable, runAgentTurn, type AnthropicMessage } from '../../lib/copilot/llmClient'
 import { respondTo } from '../../lib/copilot/respond'
 import type { CopilotAction, CopilotTurn } from '../../lib/copilot/types'
 import { CopilotBlockView } from './CopilotBlocks'
@@ -45,13 +46,20 @@ export default function CopilotPanel() {
       ],
     },
   ])
+  const [llmReady, setLlmReady] = useState<boolean | null>(null)
+  const [thinking, setThinking] = useState(false)
+  const historyRef = useRef<AnthropicMessage[]>([])
   const scrollRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const state = useScenarioStore()
 
   useEffect(() => {
+    isLLMAvailable().then(setLlmReady)
+  }, [])
+
+  useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
-  }, [turns, open])
+  }, [turns, open, thinking])
 
   function applyDials(action: CopilotAction) {
     if (action.region) state.setRegion(action.region)
@@ -94,14 +102,43 @@ export default function CopilotPanel() {
     }
   }
 
-  function send(raw?: string) {
+  async function send(raw?: string) {
     const text = (raw ?? input).trim()
-    if (!text) return
+    if (!text || thinking) return
     setInput('')
     const userTurn: CopilotTurn = { id: nextId(), role: 'user', text }
+    setTurns((prev) => [...prev, userTurn])
+
+    if (llmReady) {
+      setThinking(true)
+      try {
+        const result = await runAgentTurn(text, state, historyRef.current)
+        historyRef.current = result.history
+        setTurns((prev) => [...prev, { id: nextId(), role: 'assistant', blocks: result.blocks }])
+      } catch {
+        // Backend unreachable or the request failed mid-flight — fall back
+        // to the rule-based parser for just this message rather than
+        // leaving the user with no answer, and flag the degraded mode.
+        const reply = respondTo(text, state)
+        setTurns((prev) => [
+          ...prev,
+          {
+            id: nextId(),
+            role: 'assistant',
+            blocks: [
+              { kind: 'text', text: '(The AI understanding service is unreachable right now — answering with the rule-based fallback instead.)' },
+              ...reply.blocks,
+            ],
+          },
+        ])
+      } finally {
+        setThinking(false)
+      }
+      return
+    }
+
     const reply = respondTo(text, state)
-    const assistantTurn: CopilotTurn = { id: nextId(), role: 'assistant', blocks: reply.blocks }
-    setTurns((prev) => [...prev, userTurn, assistantTurn])
+    setTurns((prev) => [...prev, { id: nextId(), role: 'assistant', blocks: reply.blocks }])
   }
 
   return (
@@ -146,9 +183,28 @@ export default function CopilotPanel() {
                   <div className="font-mono text-[8.5px] tracking-wide text-slate-500">TOOL-USING · SAME ENGINE AS DASHBOARD</div>
                 </div>
               </div>
-              <button onClick={() => setOpen(false)} className="rounded p-1 text-slate-500 hover:bg-panel-2 hover:text-slate-200">
-                <X size={15} />
-              </button>
+              <div className="flex items-center gap-2">
+                <span
+                  title={
+                    llmReady
+                      ? 'Genuine language understanding via Claude tool-use — numbers still come from the dashboard engine, never the model.'
+                      : 'Rule-based keyword fallback — set ANTHROPIC_API_KEY in backend/.env for full language understanding.'
+                  }
+                  className={`flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[8.5px] tracking-wide ${
+                    llmReady === null
+                      ? 'border-line text-slate-600'
+                      : llmReady
+                        ? 'border-cyan/40 bg-cyan/10 text-cyan'
+                        : 'border-risk-med/40 bg-risk-med/10 text-risk-med'
+                  }`}
+                >
+                  <Sparkles size={9} />
+                  {llmReady === null ? 'CHECKING' : llmReady ? 'AI UNDERSTANDING' : 'RULE-BASED'}
+                </span>
+                <button onClick={() => setOpen(false)} className="rounded p-1 text-slate-500 hover:bg-panel-2 hover:text-slate-200">
+                  <X size={15} />
+                </button>
+              </div>
             </div>
 
             <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-3.5 py-3.5">
@@ -168,6 +224,15 @@ export default function CopilotPanel() {
                     </div>
                   </div>
                 ),
+              )}
+              {thinking && (
+                <div className="flex justify-start">
+                  <div className="flex items-center gap-1.5 rounded-lg rounded-tl-sm border border-line bg-panel-2/50 px-3 py-2.5">
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-cyan/70 [animation-delay:-0.3s]" />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-cyan/70 [animation-delay:-0.15s]" />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-cyan/70" />
+                  </div>
+                </div>
               )}
             </div>
 
@@ -195,12 +260,14 @@ export default function CopilotPanel() {
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask about exposure, scenarios, insurance…"
-                className="flex-1 bg-transparent text-[12.5px] text-slate-200 placeholder:text-slate-500 focus:outline-none"
+                disabled={thinking}
+                placeholder={thinking ? 'Thinking…' : 'Ask about exposure, scenarios, insurance…'}
+                className="flex-1 bg-transparent text-[12.5px] text-slate-200 placeholder:text-slate-500 focus:outline-none disabled:opacity-50"
               />
               <button
                 type="submit"
-                className="flex h-7 w-7 items-center justify-center rounded border border-cyan/35 bg-cyan/10 text-cyan hover:bg-cyan/20"
+                disabled={thinking}
+                className="flex h-7 w-7 items-center justify-center rounded border border-cyan/35 bg-cyan/10 text-cyan hover:bg-cyan/20 disabled:opacity-50"
               >
                 <Send size={13} />
               </button>

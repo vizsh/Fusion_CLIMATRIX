@@ -181,3 +181,14 @@ export function getOsmInfrastructure(latMin: number, lngMin: number, latMax: num
 export function checkHealth() {
   return request<{ status: string; service: string }>('/api/health', undefined, 4000)
 }
+
+export function getCopilotStatus() {
+  return request<{ configured: boolean }>('/api/copilot/status', undefined, 4000)
+}
+
+// Deliberately untyped pass-through — this mirrors Anthropic's Messages
+// API request/response shape exactly (see backend/app/api/copilot.py),
+// and copilot/llmClient.ts owns interpreting the content blocks.
+export function postCopilotChat(body: { system: string; messages: unknown[]; tools?: unknown[]; max_tokens?: number }) {
+  return request<any>('/api/copilot/chat', { method: 'POST', body: JSON.stringify(body) }, 45000)
+}
