@@ -14,6 +14,17 @@
 // premium growth, renewable-energy policy tailwinds) isn't forced into
 // the same "higher multiplier = worse" framing that fits an exposed
 // tourism or agriculture name.
+//
+// This was originally severity-only, disconnected from the region/hazard/
+// duration dial every other page already shares — which is exactly why it
+// read as thin and generic. It now scales by duration (same monthsFraction
+// mechanic as stressPdLgd) and by whether the ACTIVE hazard type is even
+// relevant to a company's sector (a drought barely moves a seafood
+// exporter's number; a cyclone barely moves an IT services firm's), via a
+// small sector→hazard relevance table — not per-company guesswork.
+
+import type { Hazard, Region } from '../store/useScenarioStore'
+import { REGION_LABEL } from '../store/useScenarioStore'
 
 export type SensitivityDirection = 'exposed' | 'beneficiary' | 'mixed' | 'resilient'
 
@@ -148,22 +159,68 @@ export const REAL_MARKET_ENTITIES: RealMarketEntity[] = [
   },
 ]
 
+// Sector -> which active hazard types actually bear on it, so the index
+// isn't "one severity number times one multiplier" regardless of whether
+// a drought in Marathwada has anything to do with a seafood exporter on
+// the Kerala coast. A small, auditable lookup table rather than a
+// per-company field to tag and maintain across 18 entries.
+const SECTOR_RELEVANT_HAZARDS: Record<string, Hazard[]> = {
+  'Tourism / Hospitality': ['Flood', 'Cyclone', 'Landslide'],
+  'Agrochemicals / Agri inputs': ['Drought', 'Flood'],
+  'Renewable energy': ['Heatwave', 'Drought'],
+  'Power (transitioning to renewables)': ['Heatwave', 'Flood'],
+  'General insurance': ['Flood', 'Cyclone', 'Drought', 'Landslide'],
+  'General insurance (PSU)': ['Flood', 'Cyclone', 'Drought', 'Landslide'],
+  'Construction materials': ['Flood', 'Cyclone', 'Landslide'],
+  'Infrastructure / Construction / Engineering': ['Flood', 'Cyclone', 'Landslide'],
+  'FMCG / Agri-linked consumer goods': ['Drought'],
+  FMCG: ['Drought'],
+  'Seafood / aquaculture export': ['Cyclone', 'Flood'],
+  'Oil & gas (upstream)': ['Cyclone'],
+  'Automotive / Manufacturing': ['Drought', 'Flood'],
+  'Conglomerate (energy, retail, telecom)': ['Cyclone', 'Flood'],
+}
+
+export function relevantHazardsFor(entity: RealMarketEntity): Hazard[] {
+  return SECTOR_RELEVANT_HAZARDS[entity.sector] ?? []
+}
+
 export interface SensitivityResult {
   entity: RealMarketEntity
-  /** 0-100 illustrative comparative index — severity scaled by the
-   * disclosed multiplier, capped at 100. NOT a probability, NOT a
-   * financial-loss estimate for a real company (that would require real
-   * facility-level data this prototype doesn't have) — a ranking aid
-   * only, same spirit as the WhatIf engine's likelihoodScore. */
+  /** 0-100 illustrative comparative index — severity × multiplier ×
+   * duration fraction × hazard-relevance factor, capped at 100. NOT a
+   * probability, NOT a financial-loss estimate for a real company (that
+   * would require real facility-level data this prototype doesn't have)
+   * — a ranking aid only, same spirit as the WhatIf engine's
+   * likelihoodScore. */
   sensitivityIndex: number
+  /** Whether the currently active hazard type is one this sector is
+   * actually exposed to — surfaced in the UI rather than silently baked
+   * into the number, so "why is this ranked where it is" stays legible. */
+  hazardRelevant: boolean
 }
 
-export function computeSensitivityIndex(entity: RealMarketEntity, severity: number): SensitivityResult {
-  return { entity, sensitivityIndex: Math.min(100, Math.round(severity * entity.vulnerabilityMultiplier)) }
+export function computeSensitivityIndex(
+  entity: RealMarketEntity,
+  severity: number,
+  durationMonths: number,
+  hazard: Hazard,
+): SensitivityResult {
+  const monthsFraction = Math.min(durationMonths / 12, 1)
+  const relevant = relevantHazardsFor(entity).includes(hazard)
+  // An "off-type" hazard still carries SOME relevance (floods disrupt even
+  // an IT campus's commute, a drought still touches regional demand) —
+  // 0.55 reflects that without pretending it's irrelevant or treating it
+  // identically to a direct hit.
+  const relevanceMultiplier = relevant ? 1 : 0.55
+  const raw = severity * entity.vulnerabilityMultiplier * monthsFraction * relevanceMultiplier
+  return { entity, sensitivityIndex: Math.min(100, Math.round(raw)), hazardRelevant: relevant }
 }
 
-export function rankBySensitivity(severity: number): SensitivityResult[] {
-  return REAL_MARKET_ENTITIES.map((e) => computeSensitivityIndex(e, severity)).sort((a, b) => b.sensitivityIndex - a.sensitivityIndex)
+export function rankBySensitivity(severity: number, durationMonths: number, hazard: Hazard): SensitivityResult[] {
+  return REAL_MARKET_ENTITIES.map((e) => computeSensitivityIndex(e, severity, durationMonths, hazard)).sort(
+    (a, b) => b.sensitivityIndex - a.sensitivityIndex,
+  )
 }
 
 export function findRealEntityByName(query: string): RealMarketEntity | null {
@@ -171,4 +228,25 @@ export function findRealEntityByName(query: string): RealMarketEntity | null {
   return (
     REAL_MARKET_ENTITIES.find((e) => lower.includes(e.name.toLowerCase()) || lower.includes(e.nseSymbol.toLowerCase())) ?? null
   )
+}
+
+/** The plain-English answer to "due to a change in climate conditions over
+ * a period of time, how and where would it affect their portfolio" — one
+ * sentence, no jargon, naming the actual active region/hazard/duration
+ * rather than a generic sector blurb. */
+export function summarizePortfolioEffect(result: SensitivityResult, region: Region, hazard: Hazard, severity: number, durationMonths: number): string {
+  const { entity, sensitivityIndex, hazardRelevant } = result
+  const monthsText = `${durationMonths} month${durationMonths === 1 ? '' : 's'}`
+  const directionVerb =
+    entity.direction === 'beneficiary'
+      ? 'would likely come out ahead'
+      : entity.direction === 'resilient'
+        ? 'would see little direct effect'
+        : entity.direction === 'mixed'
+          ? 'would see real exposure on one side and a partial offset on the other'
+          : 'would be squeezed'
+  const relevanceClause = hazardRelevant
+    ? `because ${hazard.toLowerCase()} is one of the hazard types this sector is actually exposed to`
+    : `though ${hazard.toLowerCase()} isn't this sector's primary risk, so most of the ${sensitivityIndex}/100 reading here is residual, not direct`
+  return `Over the next ${monthsText} of ${REGION_LABEL[region]}-style ${hazard.toLowerCase()} conditions at severity ${severity}/100, ${entity.name} ${directionVerb} — ${relevanceClause}.`
 }

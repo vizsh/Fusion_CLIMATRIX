@@ -514,3 +514,17 @@ export function computeEquityImpact(
     cashflowImpactCr,
   }
 }
+
+/** The plain-English answer to "what does this scenario actually do to my
+ * portfolio" — one sentence, no jargon, naming the real driver instead of
+ * leaving a user to interpret a stat block on their own. Shared by
+ * Scenario Lab and anywhere else that wants a dynamic, reactive summary
+ * instead of restating the dial values as static text. */
+export function summarizeImpactPlain(region: Region, hazard: Hazard, severity: number, durationMonths: number, impact: ImpactResult): string {
+  const monthsText = `${durationMonths} month${durationMonths === 1 ? '' : 's'}`
+  const topSector = impact.bySector[0]
+  const changeCr = impact.stressedEl - impact.baselineEl
+  const changeText = changeCr > 0.05 ? `raise modeled expected losses by ₹${changeCr.toFixed(1)} cr` : 'barely move modeled expected losses'
+  const driver = topSector ? `, driven mainly by the ${topSector.sector} sector (₹${topSector.stressedEl.toFixed(1)} cr of it)` : ''
+  return `Over the next ${monthsText}, a ${severity}/100 ${hazard.toLowerCase()} in ${REGION_LABEL[region]} would ${changeText} — from ₹${impact.baselineEl.toFixed(1)} cr to ₹${impact.stressedEl.toFixed(1)} cr across ${impact.companyCount} borrower(s)${driver}.`
+}

@@ -96,7 +96,7 @@ the bundled dataset.
 .venv/Scripts/python.exe -m pytest tests/ -v
 ```
 
-40 tests: 6 on the financial formula (parity with the frontend's
+48 tests: 6 on the financial formula (parity with the frontend's
 `stressPdLgd`/`computeImpact`, monotonicity, the 95% cap, per-company
 summation vs. blended averages, mitigation math), the API surface (health,
 company CRUD + 404, scenario-run validation and persistence, infra/OSM),

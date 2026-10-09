@@ -44,7 +44,18 @@ function Seg<T extends string>({
   )
 }
 
-export default function ScenarioConsole({ compact = false }: { compact?: boolean }) {
+export default function ScenarioConsole({
+  compact = false,
+  onRunSimulation,
+}: {
+  compact?: boolean
+  /** Called right after RUN SIMULATION starts the clock — lets a page that
+   * has nowhere visually dynamic to show the run (Scenario Lab has no map,
+   * no graph) send the user somewhere that does, instead of leaving them
+   * staring at a thin progress bar. Pages with their own live content
+   * (Digital Twin, Dependency Explorer) simply don't pass this. */
+  onRunSimulation?: () => void
+}) {
   const {
     region,
     hazard,
@@ -136,7 +147,10 @@ export default function ScenarioConsole({ compact = false }: { compact?: boolean
       <div className="ml-auto flex items-center gap-2">
         {runState === 'idle' && (
           <button
-            onClick={run}
+            onClick={() => {
+              run()
+              onRunSimulation?.()
+            }}
             className="flex items-center gap-1.5 rounded border border-risk-high/50 bg-risk-high/10 px-3 py-1.5 font-mono text-[10.5px] font-semibold tracking-wide text-risk-high hover:bg-risk-high/20"
           >
             <Play size={12} /> RUN SIMULATION

@@ -61,7 +61,19 @@ Native 3D terrain from free AWS Terrarium elevation tiles, Esri satellite
 imagery, real India district boundaries, and a **flood extent computed from
 the actual decoded elevation data** — not a hand-drawn polygon. Toggle onto
 real OpenStreetMap road/bridge geometry (via the Overpass API) instead of
-hand-placed points. Click any asset to trace its dependency chain live.
+hand-placed points. Click any asset to trace its dependency chain live —
+every node inspector now carries a real satellite thumbnail at its own
+coordinate (`lib/satelliteThumbnail.ts`).
+
+**Supply-chain movement**: one real route per region (hazard → infra →
+company, the same chain the Dependency Explorer traces), an animated
+truck/ship marker while a scenario runs, clearly labeled **"DEMO
+SIMULATION — NOT LIVE TRACKING."** Click it for a route inspector with live
+financial sensitivity — same `stressPdLgd`/`computeEquityImpact` formulas
+as everywhere else (`lib/supplyChainRoutes.ts`, `RouteInspector.tsx`).
+Kerala also gets a real **before/after satellite comparison** for the 2018
+flood — NASA GIBS imagery, 6 Feb vs. 22 Aug 2018
+(`lib/historicalImagery.ts`).
 
 ### Dependency Explorer — change the scenario, watch the graph react
 
@@ -239,6 +251,14 @@ the "why does this matter" case is made before any dial is touched.
   cr in losses" runs a real binary search over the same engine (not a
   lookup table), and honestly reports when a target isn't reachable at the
   current duration/substitutability instead of guessing.
+- **Supply-chain route lookup** — "show me the freight routes for Kerala"
+  surfaces the exact same route + financial sensitivity the Digital Twin's
+  `RouteInspector` renders.
+- **Guided tour** of all ten pages, and a **context-export** button
+  (Griid-pattern) that packages the active scenario as a paste-into-
+  ChatGPT/Claude/Griid text bundle.
+- **Voice input/output, OFF by default** — opt-in mic and speaker toggles
+  (browser Web Speech API, zero server cost); text stays the primary mode.
 
 ### Real Market Climate Sensitivity — real companies, disclosed framework
 A separate lens from the synthetic portfolio: 18 real, publicly listed
@@ -247,11 +267,18 @@ ICICI Lombard, ONGC, TCS, Sun Pharma and more) classified by climate
 sensitivity **direction** — `exposed`, `beneficiary`, `mixed`, or
 `resilient` — not every climate story is a liability; reconstruction
 demand for cement/infrastructure majors and policy tailwinds for
-renewables are modeled as real upside, not smoothed away. Click any
-company for its worst-case scenario, how it could favor them, and a
-**live real-news search** via the backend's NewsAPI/GNews connector.
-Clearly disclosed as this prototype's own illustrative framework — never
-a sourced ESG rating or investment advice.
+renewables are modeled as real upside, not smoothed away. Driven by the
+**same region/hazard/severity/duration dial as every other page** (not
+severity alone) via a sector→hazard relevance table, so a drought in
+Marathwada and a cyclone in Mumbai correctly move different companies —
+an "off-sector hazard" tag says so explicitly rather than inflating every
+index the same way. Click any company for a **plain-English summary**
+("over the next 6 months of Himachal Pradesh-style flood conditions at
+severity 90/100, X would be squeezed — because flood is one of the hazard
+types this sector is actually exposed to"), its worst-case scenario, how
+it could favor them, and a **live real-news search** via the backend's
+NewsAPI/GNews connector. Clearly disclosed as this prototype's own
+illustrative framework — never a sourced ESG rating or investment advice.
 
 ### Scenario engine (shared by every view above)
 - One Zustand store (`useScenarioStore`) is the single source of truth for
@@ -260,6 +287,12 @@ a sourced ESG rating or investment advice.
   figures and narrative text can never drift apart.
 - Four built-in profiles from ordinary conditions to compound/prolonged
   stress, or any custom dial combination.
+- **Run Simulation always leads somewhere dynamic.** Scenario Lab has no
+  map or graph of its own, so clicking it there navigates straight to the
+  Digital Twin to watch the causal-replay propagation live, instead of
+  leaving a thin progress bar as the only feedback; every page also shows
+  a live, plain-English "what this scenario actually does" sentence that
+  updates as you move any dial, not a static restatement of the inputs.
 - Saved scenarios (localStorage), a scripted Presentation Mode, and a
   causal-replay timeline derived from the actual graph BFS (not a
   hardcoded disaster script).
@@ -295,7 +328,7 @@ a sourced ESG rating or investment advice.
   an asserted `'approximate'` default.
 - Every connector reports an honest status (`ok` / `unconfigured` / `error`
   / `mock`) — never a silently empty success.
-- 40 passing backend tests: financial/insurance-formula parity with the
+- 48 passing backend tests: financial/insurance-formula parity with the
   frontend, connector honesty under failure, ML/NLP/data-quality coverage,
   API surface.
 
@@ -307,7 +340,7 @@ flowchart LR
         Graph["indiaGraphData.ts\n60 nodes · 95 edges"]
         Store["useScenarioStore\n(Zustand) — single source of truth"]
         Engine["Financial engine\nstressPdLgd · computeImpact\ncomputeEquityImpact · insurance.ts"]
-        Pages["11 pages: Command Centre, Digital Twin,\nDependency Explorer, Portfolio Impact,\nMitigation Studio, Insurance & Protection Gap,\nReal Market Sensitivity, Company Investigation,\nScenario Lab, What-If Analysis, Evidence & Reports"]
+        Pages["13 pages: Command Centre, Portfolio Dashboard,\nDigital Twin, Dependency Explorer, Portfolio Impact,\nMitigation Studio, Insurance & Protection Gap,\nReal Market Sensitivity, Company Investigation,\nScenario Lab, What-If Analysis, Evidence & Reports,\nGovernance & Proposals"]
         Graph --> Store
         Store --> Engine
         Engine --> Pages
@@ -363,7 +396,8 @@ rationale, including why SQLite over Postgres/PostGIS at this stage.
 | Database | SQLite (Postgres/PostGIS-ready via `DATABASE_URL`), migration-managed via Alembic |
 | ML / NLP | scikit-learn (`IsolationForest`, TF-IDF + cosine similarity), numpy |
 | HTTP client | `httpx` (async) |
-| Testing | `pytest` + `pytest-asyncio` (backend), `tsc --noEmit` (frontend) |
+| Local LLM (Copilot fallback) | Ollama (`llama3.1` or any pulled model), structured-output intent classification only — no API key, nothing leaves the machine |
+| Testing / CI | `pytest` (backend, 48 tests) + `tsc -b` build-mode typecheck + `oxlint` + `npm run build` (frontend) — all four run on every push/PR via `.github/workflows/ci.yml` |
 
 ## Real external data
 
@@ -460,10 +494,18 @@ Not built, scoped and ready to pick up:
 
 - **RBI climate-stress-test-aligned export template** — align the Evidence &
   Reports export format with the RBI's own 2024 pilot methodology.
-- **Scenario comparison mode** — run two scenarios side by side instead of
-  only sequentially.
+- **A dedicated side-by-side scenario UI** — the Copilot already answers
+  "compare Himachal Pradesh and Mumbai" with a matched-dial table
+  (`answerCompareRegions`), but there's no dashboard page that runs two
+  full scenarios in parallel panels.
 - **data.gov.in connector** to upgrade district risk scores from
   `assumption` to `sourced`.
+- **Change-detection illustrative badge** (Phase 4 of the imagery
+  roadmap) — explicitly labeled, non-live, for the supply-chain route
+  inspector.
+- **Governance-linked facility corrections** — let an analyst propose a
+  coordinate/note correction on a `LocationThumbnail` through the same
+  `/governance` review queue, instead of a separate building-twin system.
 - See [`docs/DATA_STRATEGY.md`](docs/DATA_STRATEGY.md) for the full
   prioritized backlog, including linkage work recommended *before* adding
   more connectors.
