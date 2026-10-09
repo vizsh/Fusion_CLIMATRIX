@@ -28,6 +28,7 @@ import { getWeatherAnomalies, semanticSearch } from '../api'
 import { NODES } from '../indiaGraphData'
 import { findBreachingSeverity } from '../reverseStressTest'
 import { sectorVulnerability } from '../sectorVulnerability'
+import { routeForRegion } from '../supplyChainRoutes'
 import { WEATHER_WINDOWS } from '../weatherWindows'
 import { REGION_LABEL, computeImpact, stressPdLgd, type ScenarioState } from '../../store/useScenarioStore'
 import type { Region } from '../../store/useScenarioStore'
@@ -165,6 +166,42 @@ export function answerCompliance(): CopilotBlock[] {
     },
     { kind: 'actions', actions: [{ id: 'open-evidence-compliance', label: 'Open Evidence & Reports', kind: 'navigate', to: '/evidence' }] },
     suggestions(['Analyse my portfolio and give me the risks', 'Which exposures may be uninsured or underinsured?']),
+  ]
+}
+
+/** "Show me the freight routes for X" / "which routes are exposed" — the
+ * supply-chain movement layer's Copilot front door. Reuses the exact
+ * route + financial math RouteInspector.tsx renders on the map, kept
+ * deliberately brief per the brief's "clearer and briefed" direction:
+ * one assessment line, the concrete number, one next step — not a
+ * seven-section essay for a one-route answer. */
+export function answerRoutes(p: ScenarioParams): CopilotBlock[] {
+  const route = routeForRegion(p.region)
+  if (!route) {
+    return [{ kind: 'text', text: `No supply-chain route is modelled for ${REGION_LABEL[p.region]} yet.` }]
+  }
+  const hazardNode = NODES.find((n) => n.id === route.hazardId)
+  const infraNode = NODES.find((n) => n.id === route.infraId)
+  const company = NODES.find((n) => n.id === route.companyId)
+  if (!hazardNode || !infraNode || !company) return []
+
+  const { stressedPd, stressedLgd } = stressPdLgd(company.baselinePd ?? 0, company.baselineLgd ?? 0, p.severity, p.durationMonths, p.substitutability, sectorVulnerability(company.sector))
+  const stressedElCr = (company.eadCr ?? 0) * stressedPd * stressedLgd
+
+  return [
+    { kind: 'heading', text: route.label },
+    {
+      kind: 'text',
+      text: `${hazardNode.label} → ${infraNode.label} → ${company.label}. At the active scenario (severity ${p.severity}/100, ${p.durationMonths}mo), this route’s modelled stressed EL for ${company.label} is ${fmtCr(stressedElCr)}.`,
+    },
+    { kind: 'text', text: 'This is a demo-simulation route (a plausible corridor between this graph’s own real coordinates) — not a live logistics feed. Open the Digital Twin and click the amber marker to inspect it.' },
+    {
+      kind: 'actions',
+      actions: [
+        { id: 'go-route', label: 'Open on the live map', kind: 'go-to-map', region: p.region },
+        { id: 'open-co', label: `Open ${company.label}`, kind: 'navigate', to: `/company?id=${company.id}` },
+      ],
+    },
   ]
 }
 

@@ -31,6 +31,7 @@ import {
   answerMethodology,
   answerPortfolio,
   answerReverseStressTest,
+  answerRoutes,
   answerRunSimulation,
   answerSetScenario,
   answerUnmappedCity,
@@ -138,6 +139,10 @@ const RULES: { test: (t: string) => boolean; handler: (ctx: Ctx, t: string) => C
   },
   { test: (t) => /brief|report|summary document/i.test(t), handler: (ctx, t) => answerBrief(regionOrCurrent(t, ctx)) },
   { test: (t) => /earning|cash flow|valuation|financial impact|credit loss|expected loss/i.test(t), handler: (ctx, t) => answerFinancial(paramsFor(t, ctx)) },
+  // Freight/movement-specific phrasing routes to the supply-chain layer;
+  // everything else dependency-shaped (bottlenecks, generic "route") still
+  // goes to the graph-wide dependency view below.
+  { test: (t) => /\b(truck|freight|shipment|vessel|cargo|port corridor|supply.?chain route|movement)\b/i.test(t), handler: (ctx, t) => answerRoutes(paramsFor(t, ctx)) },
   { test: (t) => /route|transport|supplier|bridge|road|bottleneck|dependen/i.test(t), handler: (ctx, t) => answerDependency(regionOrCurrent(t, ctx)) },
   { test: (t) => /happening|current condition|weather|news|right now/i.test(t), handler: (ctx, t) => answerClimateNews(paramsFor(t, ctx)) },
   {

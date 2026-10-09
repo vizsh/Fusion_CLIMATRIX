@@ -10,7 +10,9 @@ import {
   Layers,
   Package,
   Satellite,
+  Ship,
   ShieldCheck,
+  Truck,
   Waves,
   Zap,
 } from 'lucide-react'
@@ -18,6 +20,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MapLayerMouseEvent, MapRef } from 'react-map-gl/maplibre'
 import { Layer, Map as GLMap, Marker, NavigationControl, Popup, Source } from 'react-map-gl/maplibre'
 import EntityInspector from '../components/graph/EntityInspector'
+import RouteInspector from '../components/graph/RouteInspector'
+import HistoricalComparison from '../components/HistoricalComparison'
 import OsmRoadsLayer from '../components/OsmRoadsLayer'
 import PageHeader from '../components/PageHeader'
 import ScenarioConsole from '../components/ScenarioConsole'
@@ -25,7 +29,6 @@ import {
   CAMERA_PRESETS,
   GEO_FILE_BY_REGION,
   HP_FLOOD_EXTENT,
-  HP_NH5_ROUTE,
   institutionalStyle,
   SKY_PAINT,
   terrainSatelliteStyle,
@@ -35,7 +38,9 @@ import { cleanDistrictName, getDistrictRisk } from '../lib/districtRisk'
 import { computeFloodRibbon, loadElevationSampler, type ElevationSampler } from '../lib/floodModel'
 import { CurrentConditionsBadge, RiverDischargeBadge } from '../components/LiveConditionsBadges'
 import { graphStages, REGION_HAZARD } from '../lib/graphAnalytics'
+import { HISTORICAL_COMPARISONS } from '../lib/historicalImagery'
 import { KIND_META, NODES, type NodeKind } from '../lib/indiaGraphData'
+import { routeForRegion } from '../lib/supplyChainRoutes'
 import { useScenarioStore, type Region } from '../store/useScenarioStore'
 import { Film } from 'lucide-react'
 
@@ -83,6 +88,8 @@ export default function DigitalTwinPage() {
 
   const simulated = runState !== 'idle'
   const activeHazardNode = NODES.find((n) => n.id === REGION_HAZARD[region])
+  const historicalComparison = HISTORICAL_COMPARISONS[region]
+  const [showHistorical, setShowHistorical] = useState(false)
 
   // Decode the real DEM tiles once — used both by the 3D terrain (already
   // handled by MapLibre natively) and by our own flood-ribbon computation.
@@ -107,23 +114,37 @@ export default function DigitalTwinPage() {
   )
   const floodGeometry = computedFlood ?? HP_FLOOD_EXTENT
 
-  // Traveling pulse along the disrupted corridor — makes the propagation
-  // feel active rather than a static red line once a scenario is running.
+  // Supply-chain movement layer — one real, fully-connected route per
+  // region (hazard -> infra -> company, same chain the Dependency
+  // Explorer traces). See lib/supplyChainRoutes.ts for why this is ONE
+  // labeled demo-simulation route, not a fleet of generic icons.
+  const activeRoute = routeForRegion(region)
+  const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null)
+  const activeRouteGeoJSON = useMemo(
+    () =>
+      activeRoute
+        ? ({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: activeRoute.path } } as GeoJSON.Feature<GeoJSON.LineString>)
+        : null,
+    [activeRoute],
+  )
+
+  // Traveling marker along the route — makes the propagation feel active
+  // rather than a static line once a scenario is running.
   const [pulseT, setPulseT] = useState(0)
   useEffect(() => {
-    if (!simulated || region !== 'HP') return
+    if (!simulated || !activeRoute) return
     let raf: number
-    const CYCLE_MS = 3200
+    const CYCLE_MS = 4200
     const loop = (now: number) => {
       setPulseT((now % CYCLE_MS) / CYCLE_MS)
       raf = requestAnimationFrame(loop)
     }
     raf = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(raf)
-  }, [simulated, region])
+  }, [simulated, activeRoute])
   const pulsePos = useMemo(
-    () => (simulated && region === 'HP' ? pointAlong(HP_NH5_ROUTE.geometry.coordinates as [number, number][], pulseT) : null),
-    [simulated, region, pulseT],
+    () => (simulated && activeRoute ? pointAlong(activeRoute.path, pulseT) : null),
+    [simulated, activeRoute, pulseT],
   )
 
   function flyTo(preset: (typeof CAMERA_PRESETS)[keyof typeof CAMERA_PRESETS], level: CameraLevel) {
@@ -293,13 +314,13 @@ export default function DigitalTwinPage() {
 
           {showOsmRoads && <OsmRoadsLayer region={region} />}
 
-          {region === 'HP' && (
-            <Source type="geojson" data={HP_NH5_ROUTE}>
+          {activeRouteGeoJSON && (
+            <Source type="geojson" data={activeRouteGeoJSON}>
               <Layer
-                id="nh5-route"
+                id="supply-route"
                 type="line"
                 paint={{
-                  'line-color': simulated ? '#fb3a4a' : '#64748b',
+                  'line-color': simulated ? '#f5a524' : '#64748b',
                   'line-width': simulated ? 3.5 : 2,
                   'line-dasharray': simulated ? [1, 1.4] : [1, 0],
                 }}
@@ -336,6 +357,7 @@ export default function DigitalTwinPage() {
                 onClick={(e) => {
                   e.originalEvent.stopPropagation()
                   setDistrictPopup(null)
+                  setSelectedRouteId(null)
                   setSelectedEntity(active ? null : n.id)
                 }}
               >
@@ -363,11 +385,23 @@ export default function DigitalTwinPage() {
             )
           })}
 
-          {pulsePos && (
+          {pulsePos && activeRoute && (
             <Marker longitude={pulsePos[0]} latitude={pulsePos[1]} anchor="center">
-              <div className="relative">
-                <div className="absolute inset-0 -m-2 animate-pulse-ring rounded-full bg-risk-high" />
-                <div className="h-2.5 w-2.5 rounded-full bg-risk-high shadow-[0_0_10px_3px_rgba(251,58,74,0.7)]" />
+              <div
+                className="group relative flex cursor-pointer flex-col items-center"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setSelectedEntity(null)
+                  setSelectedRouteId(activeRoute.id)
+                }}
+              >
+                <span className="absolute -top-5 whitespace-nowrap rounded border border-amber-500/40 bg-panel/90 px-1 font-mono text-[7px] tracking-wide text-amber-400">
+                  DEMO
+                </span>
+                <div className="absolute inset-0 -m-2 animate-pulse-ring rounded-full bg-amber-500" />
+                <div className="relative flex h-5 w-5 items-center justify-center rounded-full border-2 border-white/70 bg-amber-500 shadow-[0_0_10px_3px_rgba(245,158,11,0.6)] transition-transform group-hover:scale-125">
+                  {activeRoute.mode === 'port' ? <Ship size={11} color="#05070a" /> : <Truck size={11} color="#05070a" />}
+                </div>
               </div>
             </Marker>
           )}
@@ -444,6 +478,14 @@ export default function DigitalTwinPage() {
           >
             <Layers size={11} /> REAL ROAD DATA (OSM)
           </button>
+          {historicalComparison && (
+            <button
+              onClick={() => setShowHistorical(true)}
+              className="pointer-events-auto flex items-center gap-1.5 rounded border border-amber-500/30 bg-panel/85 px-2.5 py-1.5 font-mono text-[9.5px] tracking-wide text-amber-400 backdrop-blur hover:bg-amber-500/10"
+            >
+              <Satellite size={11} /> BEFORE / AFTER (2018)
+            </button>
+          )}
           {region === 'HP' && (
             <div
               className={`pointer-events-none flex items-center gap-1.5 rounded border px-2.5 py-1.5 font-mono text-[9px] tracking-wide backdrop-blur ${
@@ -482,7 +524,25 @@ export default function DigitalTwinPage() {
         </div>
 
         <AnimatePresence>
-          {selectedEntityId ? (
+          {selectedRouteId && activeRoute && selectedRouteId === activeRoute.id ? (
+            <motion.div
+              key="route-inspector"
+              initial={{ x: 340, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: 340, opacity: 0 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              className="absolute right-0 top-0 h-full w-[340px] overflow-y-auto border-l border-line bg-panel/95 p-4 backdrop-blur"
+            >
+              <RouteInspector
+                route={activeRoute}
+                onClose={() => setSelectedRouteId(null)}
+                onInspectNode={(id) => {
+                  setSelectedRouteId(null)
+                  setSelectedEntity(id)
+                }}
+              />
+            </motion.div>
+          ) : selectedEntityId ? (
             <motion.div
               key="inspector"
               initial={{ x: 340, opacity: 0 }}
@@ -513,6 +573,10 @@ export default function DigitalTwinPage() {
       <div className="shrink-0 border-t border-line bg-panel/90">
         <ScenarioConsole compact />
       </div>
+
+      {showHistorical && historicalComparison && (
+        <HistoricalComparison data={historicalComparison} onClose={() => setShowHistorical(false)} />
+      )}
     </div>
   )
 }

@@ -18,6 +18,7 @@ import {
   answerGoToMap,
   answerInsurance,
   answerPortfolio,
+  answerRoutes,
   answerRunSimulation,
   answerWhatIf,
 } from './answers'
@@ -40,6 +41,7 @@ export type IntentId =
   | 'map'
   | 'simulate'
   | 'tour'
+  | 'routes'
 
 /** One short line per intent — this whole menu is what gets sent to the
  * local classifier, Jarvis-style (INTENT_DOC in its assistant.py): compact
@@ -58,6 +60,7 @@ export const INTENT_MENU: Record<IntentId, string> = {
   map: 'go to the live 3D map, or watch live movement of a scenario',
   simulate: 'run or start the simulation clock',
   tour: 'a guided tour of the whole app, or "what can this app do"',
+  routes: 'freight/supply-chain routes (trucks, ports), which route a holding depends on, or route-level risk',
 }
 
 export interface IntentParams {
@@ -93,6 +96,8 @@ export function runIntent(intent: IntentId, params: IntentParams, state: Scenari
       return answerRunSimulation(p)
     case 'tour':
       return answerTour()
+    case 'routes':
+      return answerRoutes(p)
   }
 }
 
