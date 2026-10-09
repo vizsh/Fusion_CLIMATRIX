@@ -1,15 +1,12 @@
-import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.connectors.base import ConnectorStatus
-from app.connectors.nasa_power import NasaPowerConnector
-from app.connectors.open_meteo import OpenMeteoArchiveConnector, OpenMeteoFloodConnector
+from app.connectors.open_meteo import OpenMeteoFloodConnector
 from app.connectors.tomorrow_io import TomorrowIoConnector
 from app.db.session import get_db
-from app.models import WeatherAnomaly, WeatherObservation
 from app.schemas.schemas import (
     AnomalyPointOut,
     CurrentConditionsOut,
@@ -21,64 +18,19 @@ from app.schemas.schemas import (
     WeatherQueryResult,
 )
 from app.services.cache import ttl_cache
-from app.services.ml_anomaly import detect_anomalies
+from app.services.scheduler import anomaly_sweep_status
+from app.services.weather_data import WeatherFetchError, resolve_observations, run_anomaly_check
 
 router = APIRouter(prefix="/api/weather", tags=["weather"])
-_nasa = NasaPowerConnector()
-_open_meteo_archive = OpenMeteoArchiveConnector()
 _open_meteo_flood = OpenMeteoFloodConnector()
 _tomorrow = TomorrowIoConnector()
 
 
-async def _resolve_observations(
-    db: Session, lat: float, lng: float, start: str, end: str
-) -> tuple[list[WeatherObservation], str, str, bool]:
-    """Shared cache-first fetch used by both /query and /anomalies — one
-    place decides "do we already have this location/date-range cached,
-    or do we need a live connector call," instead of two endpoints
-    re-implementing the same NASA POWER -> Open-Meteo fallback chain."""
-    cached = (
-        db.query(WeatherObservation)
-        .filter(
-            WeatherObservation.lat == lat,
-            WeatherObservation.lng == lng,
-            WeatherObservation.date >= start,
-            WeatherObservation.date <= end,
-        )
-        .order_by(WeatherObservation.date)
-        .all()
-    )
-    expected_days = _day_count(start, end)
-    if cached and len(cached) >= expected_days:
-        return cached, cached[0].source, cached[0].source, True
-
-    result = await _nasa.fetch(lat=lat, lng=lng, start=start, end=end)
-    source_name = "NASA POWER"
-    if result.status != ConnectorStatus.OK:
-        result = await _open_meteo_archive.fetch(lat=lat, lng=lng, start=start, end=end)
-        source_name = "Open-Meteo"
-    if result.status != ConnectorStatus.OK:
-        raise HTTPException(status_code=502, detail=f"Both weather providers failed. Last error: {result.message}")
-
-    now = datetime.now(timezone.utc)
-    rows = []
-    for r in result.data:
-        obs = WeatherObservation(
-            id=f"wx-{uuid.uuid4().hex[:10]}",
-            lat=lat,
-            lng=lng,
-            date=r["date"],
-            precipitation_mm=r["precipitation_mm"],
-            temp_c_avg=r["temp_c_avg"],
-            source=source_name,
-            retrieved_at=now,
-        )
-        db.add(obs)
-        rows.append(obs)
-    db.commit()
-    for r in rows:
-        db.refresh(r)
-    return rows, source_name, result.source_url or "", False
+async def _resolve_observations(db: Session, lat: float, lng: float, start: str, end: str):
+    try:
+        return await resolve_observations(db, lat, lng, start, end)
+    except WeatherFetchError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
 
 
 @router.post("/query", response_model=WeatherQueryResult)
@@ -131,54 +83,24 @@ async def flood_discharge(lat: float, lng: float, past_days: int = 7, forecast_d
 async def weather_anomalies(lat: float, lng: float, days: int = 60, db: Session = Depends(get_db)):
     """ML anomaly detection over this location's own recent precipitation
     history (see app/services/ml_anomaly.py) — "is this location's weather
-    behaving unlike its own baseline," not a fixed rainfall threshold.
-    Persists every scored day to WeatherAnomaly so a run is auditable
-    later, not just returned and discarded."""
-    end_dt = datetime.now(timezone.utc) - timedelta(days=2)  # reanalysis products lag by a day or two
-    start_dt = end_dt - timedelta(days=days)
-    start, end = start_dt.strftime("%Y%m%d"), end_dt.strftime("%Y%m%d")
-
-    rows, _, _, _ = await _resolve_observations(db, lat, lng, start, end)
-    series = [r for r in rows if r.precipitation_mm is not None]
-    points = detect_anomalies([r.date for r in series], [r.precipitation_mm for r in series])
-
-    now = datetime.now(timezone.utc)
-    # Replace any prior run for this exact (lat, lng, window) rather than
-    # accumulating duplicate rows on every re-check of the same location.
-    db.query(WeatherAnomaly).filter(
-        WeatherAnomaly.lat == lat, WeatherAnomaly.lng == lng, WeatherAnomaly.window_days == days
-    ).delete()
-    for p in points:
-        db.add(
-            WeatherAnomaly(
-                id=f"anom-{uuid.uuid4().hex[:10]}",
-                lat=lat,
-                lng=lng,
-                date=p.date,
-                precipitation_mm=p.value,
-                baseline_mean=p.baseline_mean,
-                baseline_std=p.baseline_std,
-                z_score=p.z_score,
-                isolation_forest_score=p.isolation_forest_score,
-                is_anomaly=p.is_anomaly,
-                method_agreement=p.method_agreement,
-                window_days=days,
-                detected_at=now,
-            )
-        )
-    db.commit()
-
+    behaving unlike its own baseline," not a fixed rainfall threshold. Same
+    scoring+persistence path as the background sweep (see
+    app/services/scheduler.py) — this is just an on-demand trigger of it."""
+    try:
+        points = await run_anomaly_check(db, lat, lng, days)
+    except WeatherFetchError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
     out_points = [AnomalyPointOut(**vars(p)) for p in points]
     return WeatherAnomalyResult(lat=lat, lng=lng, points=out_points, anomaly_count=sum(p.is_anomaly for p in points))
 
 
-def _day_count(start: str, end: str) -> int:
-    try:
-        d0 = datetime.strptime(start, "%Y%m%d")
-        d1 = datetime.strptime(end, "%Y%m%d")
-        return (d1 - d0).days + 1
-    except ValueError:
-        return 0
+@router.get("/anomalies/sweep-status")
+def anomaly_sweep_status_endpoint():
+    """Visibility into the background anomaly sweep (app/services/
+    scheduler.py): when it last ran, which regions it checked, and how
+    many anomalies it found — so "is this actually running unattended" is
+    answerable without digging through server logs."""
+    return anomaly_sweep_status()
 
 
 def _nasa_url(payload: WeatherQueryIn) -> str:

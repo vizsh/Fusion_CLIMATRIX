@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -5,6 +7,7 @@ from app.api import companies, copilot, evidence, infra, institutions, news, por
 from app.api.companies import assets_router
 from app.config import settings
 from app.logging_config import RequestLoggingMiddleware, configure_logging
+from app.services import scheduler
 
 # Schema is now migration-managed (see backend/alembic/) — no
 # Base.metadata.create_all() here. A fresh checkout runs
@@ -14,11 +17,20 @@ from app.logging_config import RequestLoggingMiddleware, configure_logging
 # exist to prevent.
 configure_logging()
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    scheduler.start()  # background ML anomaly sweep — see app/services/scheduler.py
+    yield
+    await scheduler.stop()
+
+
 app = FastAPI(
     title="CLIMATRIX India API",
     description="Backend for the CLIMATRIX India climate-risk intelligence prototype. "
     "See docs/IMPLEMENTATION_AUDIT.md and docs/DATA_STRATEGY.md in the repo root.",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(

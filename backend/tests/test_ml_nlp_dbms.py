@@ -369,3 +369,63 @@ def test_create_asset_rejects_unresolvable_location(client, monkeypatch):
     monkeypatch.setattr("app.api.companies.geocode_asset", fake_geocode_fail)
     resp = client.post("/api/assets", json={"name": "Nonexistent Place XYZ123", "kind": "infra"})
     assert resp.status_code == 422
+
+
+# ----------------------------------------------------- background sweep --
+
+
+def test_sweep_once_checks_every_region_and_updates_status(db_session, monkeypatch):
+    from app.services import scheduler
+
+    db_session.add(HazardEvent(id="hz-sweep-hp", name="x", hazard_type="Flood", region="HP", lat=31.0, lng=77.0))
+    db_session.commit()
+
+    monkeypatch.setattr("app.services.scheduler.REGION_HAZARD", {"HP": "hz-sweep-hp"})
+    monkeypatch.setattr("app.services.scheduler.SessionLocal", lambda: db_session)
+
+    async def fake_run_anomaly_check(db, lat, lng, days=60):
+        from app.services.ml_anomaly import AnomalyPoint
+
+        return [AnomalyPoint("20240101", 500.0, 5.0, 1.0, 10.0, -0.5, True, True)]
+
+    monkeypatch.setattr("app.services.scheduler.run_anomaly_check", fake_run_anomaly_check)
+    # db_session.close() would break later tests sharing the session-wide DB
+    monkeypatch.setattr(db_session, "close", lambda: None)
+
+    import asyncio
+
+    asyncio.run(scheduler._sweep_once())
+
+    status = scheduler.anomaly_sweep_status()
+    assert status["last_run_ok"] is True
+    assert status["regions_checked"] == 1
+    assert status["total_anomalies"] == 1
+
+
+def test_sweep_skips_region_with_no_seeded_hazard(db_session, monkeypatch):
+    from app.services import scheduler
+
+    monkeypatch.setattr("app.services.scheduler.REGION_HAZARD", {"ZZ": "hz-does-not-exist"})
+    monkeypatch.setattr("app.services.scheduler.SessionLocal", lambda: db_session)
+    monkeypatch.setattr(db_session, "close", lambda: None)
+
+    import asyncio
+
+    asyncio.run(scheduler._sweep_once())
+    status = scheduler.anomaly_sweep_status()
+    assert status["regions_checked"] == 0
+    assert status["last_run_ok"] is True  # an unseeded region is skipped, not a failure
+
+
+def test_sweep_status_endpoint(client):
+    resp = client.get("/api/weather/anomalies/sweep-status")
+    assert resp.status_code == 200
+    assert "enabled" in resp.json()
+
+
+def test_scheduler_start_is_disabled_under_test_settings():
+    from app.config import settings
+
+    # conftest.py sets ANOMALY_SWEEP_ENABLED=false before the app imports —
+    # confirms the background loop never fires live network calls in CI.
+    assert settings.anomaly_sweep_enabled is False

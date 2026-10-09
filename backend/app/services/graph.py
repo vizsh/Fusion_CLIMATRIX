@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Company, DependencyEdge
 
-REGION_HAZARD = {"HP": "hz-hp", "KL": "hz-kl", "MH": "hz-mh", "UK": "hz-uk"}
+REGION_HAZARD = {"HP": "hz-hp", "KL": "hz-kl", "MH": "hz-mh", "UK": "hz-uk", "MB": "hz-mb"}
 
 
 def _adjacency(db: Session) -> dict[str, list[str]]:

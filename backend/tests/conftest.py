@@ -11,6 +11,9 @@ from sqlalchemy.orm import sessionmaker
 _tmp_dir = tempfile.mkdtemp()
 _tmp_db_path = os.path.join(_tmp_dir, "test.db")
 os.environ["DATABASE_URL"] = f"sqlite:///{_tmp_db_path}"
+# Never let the background anomaly sweep (app/services/scheduler.py) make
+# live network calls when TestClient triggers app startup.
+os.environ["ANOMALY_SWEEP_ENABLED"] = "false"
 
 from app.db.session import Base  # noqa: E402
 from app.main import app  # noqa: E402

@@ -133,10 +133,16 @@ they mattered, not as an open backlog:
 
 ## Features these unlock
 
-- ~~Anomaly-triggered alerts~~ — **done**, see "What else shipped in this
-  pass" above (`GET /api/weather/anomalies`). Not yet on a schedule —
-  computed on demand per request, not via a background job — which
-  remains a reasonable next step if this needs to run unattended.
+- ~~Anomaly-triggered alerts~~ — **done**, including the background
+  schedule: `app/services/scheduler.py` re-runs the detector for every
+  region's hazard coordinates every `ANOMALY_SWEEP_INTERVAL_HOURS` (default
+  6h) via a plain asyncio task started in `main.py`'s lifespan — no new
+  dependency (Celery/APScheduler), which is all a single-instance
+  prototype needs. `GET /api/weather/anomalies/sweep-status` reports
+  whether it's running and what it last found. Disabled in tests via
+  `ANOMALY_SWEEP_ENABLED=false` so the suite never makes live network
+  calls on startup. A real multi-instance deployment would want this as
+  an actual cron/worker process instead of an in-process loop.
 - **Real landslide/flood susceptibility layers** (Bhuvan/ISRO, where terms
   allow) to replace the hand-drawn HP flood ribbon's severity-to-waterlevel
   assumption and the UK illustrative zone with sourced susceptibility

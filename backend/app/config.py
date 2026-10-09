@@ -37,5 +37,13 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.1"
 
+    # Background anomaly sweep (app/services/scheduler.py) — periodically
+    # re-runs the ML weather anomaly detector for each region's hazard
+    # coordinates instead of only on-demand per request. Off by default in
+    # tests (conftest.py sets this false) so the test suite never makes
+    # live network calls on app startup.
+    anomaly_sweep_enabled: bool = True
+    anomaly_sweep_interval_hours: float = 6.0
+
 
 settings = Settings()
