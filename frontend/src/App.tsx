@@ -9,6 +9,7 @@ import InsurancePage from './pages/InsurancePage'
 import MitigationStudioPage from './pages/MitigationStudioPage'
 import PortfolioImpactPage from './pages/PortfolioImpactPage'
 import ScenarioLabPage from './pages/ScenarioLabPage'
+import WhatIfAnalysisPage from './pages/WhatIfAnalysisPage'
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
           <Route index element={<CommandCentrePage />} />
           <Route path="twin" element={<DigitalTwinPage />} />
           <Route path="scenario" element={<ScenarioLabPage />} />
+          <Route path="what-if" element={<WhatIfAnalysisPage />} />
           <Route path="dependency" element={<DependencyExplorerPage />} />
           <Route path="company" element={<CompanyInvestigationPage />} />
           <Route path="portfolio" element={<PortfolioImpactPage />} />

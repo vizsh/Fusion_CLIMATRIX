@@ -46,7 +46,7 @@ interface SavedScenario {
   interventions: string[]
 }
 
-interface ScenarioState {
+export interface ScenarioState {
   // --- which financial lens every view renders — forks the analysis, not the data ---
   userMode: UserMode
   setUserMode: (m: UserMode) => void

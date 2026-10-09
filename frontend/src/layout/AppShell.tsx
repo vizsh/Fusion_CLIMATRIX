@@ -10,10 +10,12 @@ import {
   PieChart,
   Play,
   Shield,
+  Sparkles,
   Umbrella,
   Workflow,
 } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
+import CopilotPanel from '../components/Copilot/CopilotPanel'
 import PresentationOverlay from '../components/PresentationOverlay'
 import { REGION_LABEL, useScenarioStore, useSimulationClock } from '../store/useScenarioStore'
 
@@ -21,6 +23,7 @@ const NAV = [
   { to: '/', label: 'Command Centre', icon: LayoutGrid, end: true },
   { to: '/twin', label: 'Digital Twin', icon: Globe2 },
   { to: '/scenario', label: 'Scenario Lab', icon: Workflow },
+  { to: '/what-if', label: 'What-If Analysis', icon: Sparkles },
   { to: '/dependency', label: 'Dependency Explorer', icon: Network },
   { to: '/company', label: 'Company Investigation', icon: Building2 },
   { to: '/portfolio', label: 'Portfolio Impact', icon: PieChart },
@@ -126,6 +129,7 @@ export default function AppShell() {
       </div>
 
       {presentationActive && <PresentationOverlay />}
+      <CopilotPanel />
     </div>
   )
 }
