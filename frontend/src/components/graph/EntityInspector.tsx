@@ -1,5 +1,6 @@
 import { ArrowUpRight, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import LocationThumbnail from '../LocationThumbnail'
 import {
   companyExposureDetail,
   computeBottlenecks,
@@ -68,6 +69,10 @@ export default function EntityInspector({
           </button>
         )}
       </div>
+
+      {node.coords && (
+        <LocationThumbnail lng={node.coords[0]} lat={node.coords[1]} region={node.region !== 'National' ? node.region : undefined} label={node.label} />
+      )}
 
       {node.note && <p className="mb-3 text-[11px] leading-relaxed text-slate-500">{node.note}</p>}
 

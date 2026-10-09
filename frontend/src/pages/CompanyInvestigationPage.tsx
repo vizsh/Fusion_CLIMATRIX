@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import LocationThumbnail from '../components/LocationThumbnail'
 import PageHeader from '../components/PageHeader'
 import { companyExposureDetail, directFinanciers } from '../lib/graphAnalytics'
 import { NODES, type GNode } from '../lib/indiaGraphData'
@@ -173,6 +174,12 @@ export default function CompanyInvestigationPage() {
               Fictional company · {company.sector} · {company.region}
               {company.note && <span className="block mt-1 text-slate-600">{company.note}</span>}
             </p>
+
+            {company.coords && (
+              <div className="mt-4 max-w-md">
+                <LocationThumbnail lng={company.coords[0]} lat={company.coords[1]} region={company.region !== 'National' ? company.region : undefined} label={company.label} />
+              </div>
+            )}
 
             <div className="mt-5 grid grid-cols-3 gap-3">
               <StatCard label="Direct hazard exposure" value={directInfraParent && hazards.length ? 'Direct' : hazards.length ? 'Indirect' : 'None traced'} color={hazards.length ? (directInfraParent ? '#fb3a4a' : '#f5a524') : '#2dd4a7'} />
