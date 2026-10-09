@@ -20,6 +20,7 @@ link pattern NASA POWER established:
 | Tomorrow.io | Live current conditions (temp, humidity, rain intensity) — the "right now" complement to historical data | Digital Twin "NOW:" badge |
 | NewsAPI + GNews | Region/hazard-scoped real news search, NewsAPI primary with automatic GNews fallback | Evidence & Reports "Recent Developments" |
 | AlphaAI | Relevance-scored financial news search + reference-ticker SEC Form 4 insider summaries | Evidence & Reports "Market Intelligence" |
+| OSM Overpass | Real road/bridge way geometry (centerline, not a survey) for each region's hazard corridor, replacing hand-placed infra points | Digital Twin "REAL ROAD DATA (OSM)" layer toggle |
 
 Two things worth calling out from building these:
 
@@ -45,14 +46,24 @@ Two things worth calling out from building these:
 ## Next connectors, in order
 
 1. ~~Open-Meteo Historical Weather API~~ — **done**, see table above.
-2. **OSM Overpass API** for real road/bridge/facility geometry. Right now
-   every `infra`/`supplier` coordinate in the graph is a hand-placed point
-   (`geo_confidence` would honestly be `centroid` for almost all of them).
-   Overpass queries for `highway=*`, `bridge=yes`, `man_made=works` near each
-   hazard's bounding box would let us replace hand-placed points with real
-   OSM way geometry and flip `geo_confidence` to `approximate` or `exact`
-   honestly, not by assertion. Cache aggressively — Overpass is shared
-   public infrastructure, not an SLA'd API.
+2. ~~OSM Overpass API~~ — **done**, see table above.
+   `GET /api/infra/osm?lat_min=&lng_min=&lat_max=&lng_max=` queries
+   `highway=trunk|primary|secondary|tertiary` and `bridge=yes` ways inside a
+   bounding box, caches every result per-bbox in `OsmWay` (Overpass is shared
+   public infrastructure, not an SLA'd API — see the connector's docstring),
+   and the Digital Twin's "REAL ROAD DATA (OSM)" toggle renders the returned
+   way geometry as a map layer. Honest limitation worth recording: this
+   project's own dev sandbox gets a `406` directly from `overpass-api.de`
+   over Bash/Python `httpx` (verified live, and separately confirmed via a
+   browser-pane `fetch()` from the same machine, which succeeded — pointing
+   to IP-based anti-abuse blocking on Overpass's shared instance for this
+   sandbox's outbound IP, not a query or code problem). The connector
+   reports that as an honest `ConnectorStatus.ERROR` → `502`, exactly the
+   "never fake success" pattern every other connector follows; a deployment
+   on a different outbound IP may see it work live where this sandbox does
+   not. `Asset.geo_confidence` is not yet bulk-upgraded from the OSM data —
+   the endpoint exists and is wired into the UI, but nothing writes OSM way
+   geometry back onto existing `Asset` rows yet.
 3. **data.gov.in** district/sector datasets to replace the hand-assigned
    district risk scores (currently `assumption` class in
    `lib/districtRisk.ts`) with actual published indicators (rainfall

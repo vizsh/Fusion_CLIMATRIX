@@ -18,6 +18,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MapLayerMouseEvent, MapRef } from 'react-map-gl/maplibre'
 import { Layer, Map as GLMap, Marker, NavigationControl, Popup, Source } from 'react-map-gl/maplibre'
 import EntityInspector from '../components/graph/EntityInspector'
+import OsmRoadsLayer from '../components/OsmRoadsLayer'
 import PageHeader from '../components/PageHeader'
 import ScenarioConsole from '../components/ScenarioConsole'
 import {
@@ -71,6 +72,7 @@ export default function DigitalTwinPage() {
 
   const [styleMode, setStyleMode] = useState<'satellite' | 'institutional'>('satellite')
   const [showDistricts, setShowDistricts] = useState(true)
+  const [showOsmRoads, setShowOsmRoads] = useState(false)
   const [cameraLevel, setCameraLevel] = useState<CameraLevel>('india')
   const [districtData, setDistrictData] = useState<FeatureCollection | null>(null)
   const [districtPopup, setDistrictPopup] = useState<{ lng: number; lat: number; name: string; risk: number } | null>(
@@ -246,6 +248,8 @@ export default function DigitalTwinPage() {
             </Source>
           )}
 
+          {showOsmRoads && <OsmRoadsLayer region={region} />}
+
           {region === 'HP' && (
             <Source type="geojson" data={HP_NH5_ROUTE}>
               <Layer
@@ -388,6 +392,14 @@ export default function DigitalTwinPage() {
             }`}
           >
             <Layers size={11} /> DISTRICT RISK
+          </button>
+          <button
+            onClick={() => setShowOsmRoads((v) => !v)}
+            className={`pointer-events-auto flex items-center gap-1.5 rounded border px-2.5 py-1.5 font-mono text-[9.5px] tracking-wide backdrop-blur ${
+              showOsmRoads ? 'border-cyan/40 bg-cyan/10 text-cyan' : 'border-line bg-panel/85 text-slate-400'
+            }`}
+          >
+            <Layers size={11} /> REAL ROAD DATA (OSM)
           </button>
           {region === 'HP' && (
             <div

@@ -171,6 +171,26 @@ class WeatherObservation(Base):
     retrieved_at: Mapped[datetime] = mapped_column(default=_now)
 
 
+class OsmWay(Base):
+    """Real road/bridge geometry from OSM Overpass, cached per bounding box —
+    Overpass is shared public infrastructure, not an SLA'd API, so every
+    bbox is fetched live once and served from here after that. Replaces
+    hand-placed infra points with actual way geometry; geo_confidence for
+    anything drawn from this table is honestly 'approximate' (way centerline,
+    not a surveyed asset footprint), not 'exact'."""
+
+    __tablename__ = "osm_ways"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)  # f"osm-way-{osm_id}"
+    osm_id: Mapped[int] = mapped_column(Integer)
+    bbox_key: Mapped[str] = mapped_column(String, index=True)
+    highway: Mapped[str | None] = mapped_column(String, nullable=True)
+    bridge: Mapped[bool] = mapped_column(default=False)
+    name: Mapped[str] = mapped_column(String, default="")
+    geometry_json: Mapped[str] = mapped_column(Text)  # JSON list of [lat, lng]
+    retrieved_at: Mapped[datetime] = mapped_column(default=_now)
+
+
 class NewsArticle(Base):
     """Real articles fetched live from NewsAPI/GNews/AlphaAI. `query` records
     what search produced this row (region/hazard keywords, not a company —

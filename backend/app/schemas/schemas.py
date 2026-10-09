@@ -185,6 +185,21 @@ class NewsQueryResult(BaseModel):
     evidence_class: str = "sourced"
 
 
+class OsmWayOut(BaseModel):
+    id: str
+    highway: str | None
+    bridge: bool
+    name: str
+    geometry: list[list[float]]  # [[lat, lng], ...] way centerline
+
+
+class OsmInfraResult(BaseModel):
+    ways: list[OsmWayOut]
+    source: str
+    cached: bool
+    evidence_class: str = "sourced"
+
+
 class InsiderSummaryResult(BaseModel):
     ticker: str
     raw: dict

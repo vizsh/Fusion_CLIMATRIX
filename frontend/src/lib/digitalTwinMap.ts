@@ -137,6 +137,16 @@ export const HP_FLOOD_EXTENT: GeoJSON.Feature<GeoJSON.Polygon> = {
   },
 }
 
+// Tight bounding boxes (latMin, lngMin, latMax, lngMax) around each region's
+// hazard corridor, not the whole state — keeps the OSM Overpass query small
+// and fast against a shared public instance with no SLA.
+export const REGION_BBOX: Record<Region, [number, number, number, number]> = {
+  HP: [31.85, 76.95, 32.25, 77.35],
+  KL: [10.05, 76.2, 10.55, 76.6],
+  MH: [18.6, 76.1, 19.2, 76.7],
+  UK: [30.25, 79.3, 30.75, 79.8],
+}
+
 // The NH-5 corridor spine, used to render the "disrupted route" line.
 export const HP_NH5_ROUTE: GeoJSON.Feature<GeoJSON.LineString> = {
   type: 'Feature',

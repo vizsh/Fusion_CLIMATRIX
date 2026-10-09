@@ -155,6 +155,29 @@ export function listPortfolios() {
   return request<PortfolioSummary[]>('/api/portfolios')
 }
 
+export interface OsmWay {
+  id: string
+  highway: string | null
+  bridge: boolean
+  name: string
+  geometry: [number, number][] // [lat, lng] pairs, way centerline
+}
+
+export interface OsmInfraResult {
+  ways: OsmWay[]
+  source: string
+  cached: boolean
+  evidence_class: string
+}
+
+export function getOsmInfrastructure(latMin: number, lngMin: number, latMax: number, lngMax: number) {
+  return request<OsmInfraResult>(
+    `/api/infra/osm?lat_min=${latMin}&lng_min=${lngMin}&lat_max=${latMax}&lng_max=${lngMax}`,
+    undefined,
+    25000, // Overpass can be slow on a cold cache — longer timeout than other endpoints
+  )
+}
+
 export function checkHealth() {
   return request<{ status: string; service: string }>('/api/health', undefined, 4000)
 }

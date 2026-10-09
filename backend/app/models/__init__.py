@@ -6,6 +6,7 @@ from app.models.entities import (
     HazardEvent,
     NewsArticle,
     Organization,
+    OsmWay,
     Portfolio,
     Position,
     ScenarioRun,
@@ -24,4 +25,5 @@ __all__ = [
     "ScenarioRun",
     "WeatherObservation",
     "NewsArticle",
+    "OsmWay",
 ]
