@@ -1,5 +1,12 @@
 # CLIMATRIX India — Implementation Audit
 
+> **Historical snapshot.** Written against commit `de5d779`, before the
+> backend, the insurance lens, the parametric trigger, and five of the
+> connectors existed. Kept as a dated point-in-time audit rather than
+> updated in place — see [`FEATURES.md`](FEATURES.md) for the current
+> feature set and [`ARCHITECTURE.md`](ARCHITECTURE.md) for the current
+> design.
+
 Written against commit `de5d779` (main), before the backend work in this pass.
 
 ## 1. Current architecture
