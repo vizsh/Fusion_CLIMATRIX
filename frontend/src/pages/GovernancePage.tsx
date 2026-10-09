@@ -9,10 +9,15 @@
 // codebase; that stays a deliberate manual follow-up, logged here as the
 // audit trail for why it changed.
 
-import { Check, ClipboardCheck, Plus, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { Check, ClipboardCheck, Clipboard, Download, Link2, Plus, Share2, X } from 'lucide-react'
+import { useEffect, type ReactNode, useState } from 'react'
 import PageHeader from '../components/PageHeader'
+import {
+  copyContextBundle, copyContextBundleJSON, copyGovernanceBundle, copyShareableLink,
+  downloadContextBundle, downloadContextBundleJSON, downloadGovernanceBundle, parseImportedContext,
+} from '../lib/copilot/contextExport'
 import { ApiError, createProposal, listProposals, reviewProposal, type ProposedUpdate } from '../lib/api'
+import { useScenarioStore } from '../store/useScenarioStore'
 
 const KIND_LABEL: Record<ProposedUpdate['kind'], string> = {
   sector_vulnerability: 'Sector physical vulnerability',
@@ -162,6 +167,120 @@ function NewProposalForm({ onCreated }: { onCreated: () => void }) {
   )
 }
 
+function ActionButton({ label, icon, done, onClick }: { label: string; icon: ReactNode; done: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-1.5 rounded border px-2.5 py-1.5 font-mono text-[10px] tracking-wide ${
+        done ? 'border-risk-low/40 bg-risk-low/10 text-risk-low' : 'border-line bg-panel text-slate-400 hover:border-cyan/40 hover:text-cyan'
+      }`}
+    >
+      {done ? <Check size={12} /> : icon} {done ? 'DONE' : label}
+    </button>
+  )
+}
+
+function GriidBridgePanel({ proposals }: { proposals: ProposedUpdate[] }) {
+  const state = useScenarioStore()
+  const setRegion = useScenarioStore((s) => s.setRegion)
+  const setHazard = useScenarioStore((s) => s.setHazard)
+  const setSeverity = useScenarioStore((s) => s.setSeverity)
+  const setDuration = useScenarioStore((s) => s.setDuration)
+  const setSubstitutability = useScenarioStore((s) => s.setSubstitutability)
+  const setUserMode = useScenarioStore((s) => s.setUserMode)
+
+  const [flash, setFlash] = useState<string | null>(null)
+  const [pasteText, setPasteText] = useState('')
+  const [importResult, setImportResult] = useState<{ ok: boolean; message: string } | null>(null)
+
+  function flashFor(key: string, ms = 1500) {
+    setFlash(key)
+    setTimeout(() => setFlash((f) => (f === key ? null : f)), ms)
+  }
+
+  async function run(key: string, action: () => void | Promise<boolean>) {
+    const result = await action()
+    if (result === false) return // clipboard denied — action already fell back or no-op'd
+    flashFor(key)
+  }
+
+  function doImport() {
+    const result = parseImportedContext(pasteText)
+    if (!result.ok || !result.scenario) {
+      setImportResult({ ok: false, message: result.error || 'Could not parse that as a CLIMATRIX context bundle.' })
+      return
+    }
+    const s = result.scenario
+    setRegion(s.region)
+    setHazard(s.hazard)
+    setSeverity(s.severity)
+    setDuration(s.durationMonths)
+    setSubstitutability(s.substitutability)
+    setUserMode(s.userMode)
+    const fpNote =
+      result.fingerprintMatches === true
+        ? ' Fingerprint matches — nothing drifted in transit.'
+        : result.fingerprintMatches === false
+          ? ' Fingerprint MISMATCH — this bundle may have been edited after export; verify the numbers before relying on them.'
+          : ''
+    setImportResult({ ok: true, message: `Restored ${s.region} · ${s.hazard} · severity ${s.severity}/100 · ${s.durationMonths}mo.${fpNote}` })
+    setPasteText('')
+  }
+
+  return (
+    <div className="max-w-2xl rounded-lg border border-cyan/30 bg-panel-2 p-4">
+      <div className="mb-1 flex items-center gap-1.5 font-mono text-[10px] tracking-[0.15em] text-cyan">
+        <Share2 size={12} /> GRIID BRIDGE — PORTABLE, FINGERPRINTED CONTEXT HANDOFF
+      </div>
+      <p className="mb-3 text-[11px] leading-relaxed text-slate-400">
+        A public griid.ai API could not be confirmed to exist, so this implements the pattern directly: export the
+        live scenario (or the approved assumption ledger below) as a fingerprinted bundle for ChatGPT, Claude, Griid
+        or any AI workspace, then paste a bundle back in — yours or a teammate's — to restore it exactly, with
+        the fingerprint re-checked for drift.
+      </p>
+
+      <div className="mb-3 flex flex-wrap gap-2">
+        <ActionButton label="COPY TEXT" icon={<Clipboard size={12} />} done={flash === 'text'} onClick={() => run('text', () => copyContextBundle(state))} />
+        <ActionButton label="COPY JSON" icon={<Clipboard size={12} />} done={flash === 'json'} onClick={() => run('json', () => copyContextBundleJSON(state))} />
+        <ActionButton label="COPY LINK" icon={<Link2 size={12} />} done={flash === 'link'} onClick={() => run('link', () => copyShareableLink(state))} />
+        <ActionButton label=".MD FILE" icon={<Download size={12} />} done={flash === 'md'} onClick={() => run('md', () => downloadContextBundle(state))} />
+        <ActionButton label=".JSON FILE" icon={<Download size={12} />} done={flash === 'jsonfile'} onClick={() => run('jsonfile', () => downloadContextBundleJSON(state))} />
+      </div>
+
+      <div className="mb-3 border-t border-line pt-3">
+        <div className="mb-1.5 font-mono text-[9.5px] tracking-[0.15em] text-slate-500">INSTITUTIONAL LEDGER (APPROVED ASSUMPTIONS ONLY)</div>
+        <div className="flex flex-wrap gap-2">
+          <ActionButton label="COPY LEDGER" icon={<Clipboard size={12} />} done={flash === 'ledger'} onClick={() => run('ledger', () => copyGovernanceBundle(proposals))} />
+          <ActionButton label="DOWNLOAD LEDGER" icon={<Download size={12} />} done={flash === 'ledgerfile'} onClick={() => run('ledgerfile', () => downloadGovernanceBundle(proposals))} />
+        </div>
+      </div>
+
+      <div className="border-t border-line pt-3">
+        <div className="mb-1.5 font-mono text-[9.5px] tracking-[0.15em] text-slate-500">IMPORT A CONTEXT BUNDLE</div>
+        <textarea
+          value={pasteText}
+          onChange={(e) => setPasteText(e.target.value)}
+          rows={3}
+          placeholder="Paste a CLIMATRIX text bundle, JSON export, or shareable link (from here, a teammate, or an AI workspace you pasted it into and back)…"
+          className="w-full rounded border border-line bg-panel px-2.5 py-1.5 text-[11px] text-slate-300 placeholder:text-slate-600 focus:border-cyan/50 focus:outline-none"
+        />
+        <div className="mt-2 flex items-center gap-2">
+          <button
+            onClick={doImport}
+            disabled={!pasteText.trim()}
+            className="rounded border border-cyan/40 bg-cyan/10 px-3 py-1.5 font-mono text-[10px] tracking-wide text-cyan hover:bg-cyan/20 disabled:opacity-40"
+          >
+            IMPORT INTO CURRENT SCENARIO
+          </button>
+        </div>
+        {importResult && (
+          <p className={`mt-2 text-[10.5px] leading-relaxed ${importResult.ok ? 'text-risk-low' : 'text-risk-high'}`}>{importResult.message}</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function GovernancePage() {
   const [proposals, setProposals] = useState<ProposedUpdate[]>([])
   const [loading, setLoading] = useState(true)
@@ -216,6 +335,8 @@ export default function GovernancePage() {
             work, not pretended here).
           </p>
         </div>
+
+        <GriidBridgePanel proposals={proposals} />
 
         <div className="flex items-center gap-3">
           <NewProposalForm onCreated={load} />

@@ -17,9 +17,11 @@ import {
   Umbrella,
   Workflow,
 } from 'lucide-react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { NavLink, Outlet, useSearchParams } from 'react-router-dom'
 import CopilotPanel from '../components/Copilot/CopilotPanel'
 import PresentationOverlay from '../components/PresentationOverlay'
+import { decodeShareParam } from '../lib/copilot/contextExport'
 import { REGION_LABEL, useScenarioStore, useSimulationClock } from '../store/useScenarioStore'
 
 const NAV = [
@@ -60,9 +62,51 @@ export default function AppShell() {
   const presentationActive = useScenarioStore((s) => s.presentationActive)
   const userMode = useScenarioStore((s) => s.userMode)
   const setUserMode = useScenarioStore((s) => s.setUserMode)
+  const setRegion = useScenarioStore((s) => s.setRegion)
+  const setHazard = useScenarioStore((s) => s.setHazard)
+  const setSeverity = useScenarioStore((s) => s.setSeverity)
+  const setDuration = useScenarioStore((s) => s.setDuration)
+  const setSubstitutability = useScenarioStore((s) => s.setSubstitutability)
+
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [importBanner, setImportBanner] = useState<string | null>(null)
+
+  // Griid-pattern inbound link: "#/scenario?griid=<encoded>" restores an
+  // exact scenario shared from another browser/teammate, no backend call.
+  // Depends on the param itself (not just mount) — AppShell is the layout
+  // route and stays mounted across in-app navigation, so a griid link
+  // pasted into an already-open tab's address bar must still be caught.
+  const griidParam = searchParams.get('griid')
+  useEffect(() => {
+    const encoded = griidParam
+    if (!encoded) return
+    const decoded = decodeShareParam(encoded)
+    if (decoded) {
+      setRegion(decoded.region)
+      setHazard(decoded.hazard)
+      setSeverity(decoded.severity)
+      setDuration(decoded.durationMonths)
+      setSubstitutability(decoded.substitutability)
+      setUserMode(decoded.userMode)
+      setImportBanner(`Restored a shared scenario — ${REGION_LABEL[decoded.region]} · ${decoded.hazard} · severity ${decoded.severity}/100`)
+    } else {
+      setImportBanner('Could not read the shared scenario link — it may be corrupted or incomplete.')
+    }
+    const next = new URLSearchParams(searchParams)
+    next.delete('griid')
+    setSearchParams(next, { replace: true })
+    const t = setTimeout(() => setImportBanner(null), 6000)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [griidParam])
 
   return (
     <div className="flex h-screen w-screen flex-col bg-base">
+      {importBanner && (
+        <div className="fixed left-1/2 top-3 z-50 -translate-x-1/2 rounded-full border border-cyan/40 bg-panel/95 px-4 py-1.5 font-mono text-[10.5px] tracking-wide text-cyan shadow-lg backdrop-blur">
+          {importBanner}
+        </div>
+      )}
       <header className="flex h-12 shrink-0 items-center justify-between border-b border-line bg-panel/90 px-4 backdrop-blur">
         <div className="flex items-center gap-2.5">
           <div className="flex h-7 w-7 items-center justify-center rounded border border-cyan/30 bg-cyan/[0.08]">

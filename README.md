@@ -174,12 +174,20 @@ the "why does this matter" case is made before any dial is touched.
   a reviewer approves or rejects it. Backend-persisted (`ProposedUpdate`,
   `app/api/proposals.py`) as the audit trail — approving does not
   auto-rewrite the targeted constant, a deliberate scope boundary.
-- The Copilot can also **export the active scenario context** (region,
-  dials, key figures, evidence classes) as a text bundle to paste into
-  another AI workspace (`lib/copilot/contextExport.ts`) — both are
-  CLIMATRIX's own implementation of the griid.ai pattern (shared knowledge,
-  reviewed before it becomes institutional memory), built natively with no
-  dependency on Griid's product existing.
+- **Griid Bridge** (`lib/copilot/contextExport.ts`, on the Governance page
+  and in the Copilot header): a two-way, fingerprinted context handoff —
+  copy/download the active scenario as a text or JSON bundle, copy a
+  shareable link that restores it exactly for anyone who opens it
+  (`#/scenario?griid=<encoded>`, no backend round trip), export the
+  *approved* assumption ledger separately from pending proposals so another
+  AI workspace reasons only with institutional, reviewed numbers, and paste
+  a bundle back in — this tool's own JSON, a teammate's, or the plain text
+  someone pasted into ChatGPT/Claude and pasted back — to restore a
+  scenario, with a client-side fingerprint recomputed on import to flag
+  anything that drifted in transit. A public griid.ai API could not be
+  confirmed to exist at build time, so none of this depends on it — it's a
+  from-scratch implementation of the *pattern* the name describes (shared,
+  versioned context that survives moving between AI tools).
 
 ### For a bank / credit risk team
 - Per-borrower expected credit loss, stressed by a transparent, disclosed

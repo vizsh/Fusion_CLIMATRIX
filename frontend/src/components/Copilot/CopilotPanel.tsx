@@ -14,10 +14,10 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Maximize2, Mic, MicOff, Minimize2, Radar, Send, Share2, Volume2, VolumeX, X } from 'lucide-react'
+import { Check, Link2, Maximize2, Mic, MicOff, Minimize2, Radar, Send, Share2, Volume2, VolumeX, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useScenarioStore } from '../../store/useScenarioStore'
-import { downloadContextBundle } from '../../lib/copilot/contextExport'
+import { copyContextBundle, copyShareableLink, downloadContextBundle } from '../../lib/copilot/contextExport'
 import { downloadBrief, downloadPortfolioBrief, generatePortfolioOverview, generateWhatIf } from '../../lib/copilot/engine'
 import { ollamaStatus, warmUpOllama } from '../../lib/copilot/ollamaClient'
 import { respondTo } from '../../lib/copilot/respond'
@@ -62,6 +62,7 @@ export default function CopilotPanel() {
   const [thinking, setThinking] = useState(false)
   const [listening, setListening] = useState(false)
   const [voiceOut, setVoiceOut] = useState(false) // opt-in, off by default
+  const [justCopied, setJustCopied] = useState<'bundle' | 'link' | null>(null)
   const stopListenRef = useRef<() => void>(() => {})
   const scrollRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
@@ -77,6 +78,24 @@ export default function CopilotPanel() {
   }, [turns, open, thinking])
 
   useEffect(() => stopSpeaking, []) // never leave speech running after unmount
+
+  async function handleCopyBundle() {
+    const ok = await copyContextBundle(state)
+    if (ok) {
+      setJustCopied('bundle')
+      setTimeout(() => setJustCopied(null), 1600)
+    } else {
+      downloadContextBundle(state) // clipboard blocked (permissions/insecure context) — fall back to a file
+    }
+  }
+
+  async function handleCopyLink() {
+    const ok = await copyShareableLink(state)
+    if (ok) {
+      setJustCopied('link')
+      setTimeout(() => setJustCopied(null), 1600)
+    }
+  }
 
   function applyDials(action: CopilotAction) {
     if (action.region) state.setRegion(action.region)
@@ -203,11 +222,18 @@ export default function CopilotPanel() {
               </div>
               <div className="flex items-center gap-1.5">
                 <button
-                  onClick={() => downloadContextBundle(state)}
-                  title="Export the active scenario + evidence as a text bundle you can paste into ChatGPT, Claude, Griid or any other AI workspace (Griid-pattern 'context comes with you')"
-                  className="flex h-6 w-6 items-center justify-center rounded border border-line text-slate-500 hover:text-slate-300"
+                  onClick={handleCopyBundle}
+                  title="Copy the active scenario + evidence as a fingerprinted text bundle you can paste into ChatGPT, Claude, Griid or any other AI workspace, and paste back into Governance → Griid Bridge later to restore it"
+                  className={`flex h-6 w-6 items-center justify-center rounded border ${justCopied === 'bundle' ? 'border-risk-low/40 text-risk-low' : 'border-line text-slate-500 hover:text-slate-300'}`}
                 >
-                  <Share2 size={12} />
+                  {justCopied === 'bundle' ? <Check size={12} /> : <Share2 size={12} />}
+                </button>
+                <button
+                  onClick={handleCopyLink}
+                  title="Copy a shareable link that restores this exact scenario (region, hazard, severity, duration, substitutability, lens) for anyone who opens it"
+                  className={`flex h-6 w-6 items-center justify-center rounded border ${justCopied === 'link' ? 'border-risk-low/40 text-risk-low' : 'border-line text-slate-500 hover:text-slate-300'}`}
+                >
+                  {justCopied === 'link' ? <Check size={12} /> : <Link2 size={12} />}
                 </button>
                 {isVoiceOutputSupported() && (
                   <button

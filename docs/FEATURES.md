@@ -34,7 +34,11 @@ screenshots.
 |---|---|---|
 | Propose a change to a disclosed assumption with a rationale | `backend/app/api/proposals.py`, `ProposedUpdate` table | Real (review-workflow prototype, no auth) |
 | Approve/reject with reviewer + note, audit-trailed | Same table, `status`/`reviewer`/`reviewed_at` | Real |
-| Copilot "export context" to another AI workspace | `lib/copilot/contextExport.ts` | Real |
+| **Griid Bridge** — copy/download the live scenario as a fingerprinted text or JSON bundle | `buildContextBundle`/`buildContextPayload` in `lib/copilot/contextExport.ts` | Real |
+| Shareable link restores an exact scenario, no backend call | `buildShareableLink`/`decodeShareParam`; auto-applied on load or mid-session by `AppShell.tsx`'s `griid` param watcher | Real |
+| Paste-back import — accepts this tool's JSON, a teammate's, or a pasted markdown bundle | `parseImportedContext()` (JSON path + regex fallback over the human-readable export) | Real |
+| Approved-only assumption ledger export, separate from pending proposals | `buildGovernanceBundle()` — so another AI workspace only cites reviewed, institutional figures | Real |
+| Fingerprint recomputed on import to flag drift | `fingerprint()` (FNV-1a over the scenario fields), compared client-side, never trusted blindly | Real |
 
 ## 2. Digital Twin (`/twin`)
 
@@ -175,7 +179,7 @@ page uses (`lib/copilot/answers.ts`).
 | Reverse stress test, ML anomaly bridge, semantic news search | `answerReverseStressTest`, `answerWeatherAnomaly`, `answerBackendNewsSearch` | Modeled / Sourced |
 | Supply-chain route lookup ("show me freight routes for X") | `answerRoutes` — same route + financial math as `RouteInspector.tsx` | Modeled |
 | Guided tour of the whole app | `lib/copilot/tours.ts` | Real guidance |
-| Context export to another AI workspace (Griid pattern) | `lib/copilot/contextExport.ts` | Real |
+| Griid Bridge quick actions (copy bundle, copy shareable link) in the panel header | `CopilotPanel.tsx` — full export/import surface lives on the Governance page (§1b) | Real |
 | Voice input/output, OFF by default | `lib/copilot/voice.ts` — browser Web Speech API, no server round trip | Real |
 | Expand/collapse toggle | `CopilotPanel.tsx` — the fixed 420px docked width was cramping tables/comparison blocks; expanded mode (`inset-5`) gives them room | Real (bug fix) |
 
