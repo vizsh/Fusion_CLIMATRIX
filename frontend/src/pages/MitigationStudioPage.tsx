@@ -1,10 +1,10 @@
 import { motion } from 'framer-motion'
-import { Check, SlidersHorizontal } from 'lucide-react'
+import { Check, SlidersHorizontal, Zap } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import PageHeader from '../components/PageHeader'
 import ScenarioConsole from '../components/ScenarioConsole'
 import { computeBottlenecks, computeHazardReach, REGION_HAZARD } from '../lib/graphAnalytics'
-import { combinedReductionShare, INTERVENTIONS } from '../lib/interventions'
+import { combinedReductionShare, INTERVENTIONS, isParametricTriggered, parametricPayout } from '../lib/interventions'
 import { sectorVulnerability } from '../lib/sectorVulnerability'
 import { computeImpact, REGION_LABEL, stressPdLgd, useScenarioStore } from '../store/useScenarioStore'
 
@@ -41,26 +41,34 @@ export default function MitigationStudioPage() {
   const mostExposedCompany = reach.companies.slice().sort((a, b) => (b.eadCr ?? 0) - (a.eadCr ?? 0))[0] ?? null
 
   // Per-company breakdown — who actually benefits from the currently
-  // enabled interventions, not just the portfolio-level aggregate.
+  // enabled interventions, not just the portfolio-level aggregate. A
+  // triggered parametric payout is portfolio-level (one treaty), so it's
+  // allocated here pro-rata by each borrower's share of stressed loss.
   const reduction = combinedReductionShare(interventions)
+  const payoutCr = parametricPayout(interventions, state.severity)
   const companyRows = useMemo(() => {
-    return reach.companies
-      .map((c) => {
-        const { stressedPd, stressedLgd } = stressPdLgd(
-          c.baselinePd ?? 0,
-          c.baselineLgd ?? 0,
-          state.severity,
-          state.durationMonths,
-          state.substitutability,
-          sectorVulnerability(c.sector),
-        )
-        const baselineEl = (c.eadCr ?? 0) * (c.baselinePd ?? 0) * (c.baselineLgd ?? 0)
-        const stressedEl = (c.eadCr ?? 0) * stressedPd * stressedLgd
-        const mitigatedEl = baselineEl + (stressedEl - baselineEl) * (1 - reduction)
-        return { company: c, baselineEl, stressedEl, mitigatedEl, avoided: stressedEl - mitigatedEl }
+    const raw = reach.companies.map((c) => {
+      const { stressedPd, stressedLgd } = stressPdLgd(
+        c.baselinePd ?? 0,
+        c.baselineLgd ?? 0,
+        state.severity,
+        state.durationMonths,
+        state.substitutability,
+        sectorVulnerability(c.sector),
+      )
+      const baselineEl = (c.eadCr ?? 0) * (c.baselinePd ?? 0) * (c.baselineLgd ?? 0)
+      const stressedEl = (c.eadCr ?? 0) * stressedPd * stressedLgd
+      return { company: c, baselineEl, stressedEl }
+    })
+    const totalStressedEl = raw.reduce((s, r) => s + r.stressedEl, 0)
+    return raw
+      .map((r) => {
+        const proRataPayout = totalStressedEl ? payoutCr * (r.stressedEl / totalStressedEl) : 0
+        const mitigatedEl = Math.max(r.baselineEl, r.baselineEl + (r.stressedEl - r.baselineEl) * (1 - reduction) - proRataPayout)
+        return { ...r, mitigatedEl, avoided: r.stressedEl - mitigatedEl }
       })
       .sort((a, b) => b.stressedEl - a.stressedEl)
-  }, [reach.companies, state.severity, state.durationMonths, state.substitutability, reduction])
+  }, [reach.companies, state.severity, state.durationMonths, state.substitutability, reduction, payoutCr])
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
@@ -129,7 +137,33 @@ export default function MitigationStudioPage() {
                     No matching bottleneck in this scenario
                   </div>
                 )}
-                <div className="mt-2 font-mono-tnum text-[11px] text-slate-400">Cost: ₹{i.costCr} cr</div>
+                {i.kind === 'parametric' && (
+                  <div className="mt-2 space-y-1.5">
+                    <div className="flex items-center justify-between text-[10px] text-slate-500">
+                      <span>Trigger</span>
+                      <span className="text-slate-400">severity ≥ {i.triggerSeverityThreshold}/100</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] text-slate-500">
+                      <span>Payout if triggered</span>
+                      <span className="text-slate-400">₹{i.payoutCr} cr fixed</span>
+                    </div>
+                    <div
+                      className={`flex items-center gap-1 rounded border px-1.5 py-1 font-mono text-[9.5px] tracking-wide ${
+                        isParametricTriggered(i, state.severity)
+                          ? 'border-risk-low/40 bg-risk-low/10 text-risk-low'
+                          : 'border-line text-slate-600'
+                      }`}
+                    >
+                      <Zap size={10} />
+                      {isParametricTriggered(i, state.severity)
+                        ? `TRIGGERED — ₹${i.payoutCr} cr released`
+                        : `NOT TRIGGERED at severity ${state.severity}`}
+                    </div>
+                  </div>
+                )}
+                <div className="mt-2 font-mono-tnum text-[11px] text-slate-400">
+                  {i.kind === 'parametric' ? 'Premium' : 'Cost'}: ₹{i.costCr} cr
+                </div>
               </button>
             )
           })}
@@ -171,6 +205,25 @@ export default function MitigationStudioPage() {
           />
         </div>
 
+        {interventions.includes('parametric-trigger') && (
+          <div
+            className={`mt-3 flex items-center justify-between rounded-lg border px-4 py-3 text-[11px] ${
+              impact.parametricPayoutCr > 0
+                ? 'border-risk-low/40 bg-risk-low/[0.06] text-risk-low'
+                : 'border-line bg-panel-2 text-slate-500'
+            }`}
+          >
+            <span className="flex items-center gap-1.5">
+              <Zap size={12} /> Parametric trigger status at severity {state.severity}/100
+            </span>
+            <span className="font-mono-tnum">
+              {impact.parametricPayoutCr > 0
+                ? `TRIGGERED — ₹${impact.parametricPayoutCr.toFixed(0)} cr paid, folded into mitigated EL above`
+                : 'NOT TRIGGERED — ₹0 payout (premium still sunk)'}
+            </span>
+          </div>
+        )}
+
         <div className="mt-6 rounded-lg border border-line bg-panel-2 p-4">
           <div className="mb-2 font-mono text-[10px] tracking-[0.15em] text-slate-500">
             WHO BENEFITS — PER-BORROWER BREAKDOWN
@@ -211,7 +264,12 @@ export default function MitigationStudioPage() {
           reduction share currently applies uniformly across affected borrowers; it does not verify
           that the intervention physically reaches every listed dependency. A real decision would
           also weigh implementation time, effectiveness uncertainty, and whether the intervention
-          itself remains exposed to the same hazard.
+          itself remains exposed to the same hazard. The parametric trigger is modeled with real
+          basis risk: it pays the full ₹{INTERVENTIONS.find((i) => i.id === 'parametric-trigger')?.payoutCr} cr the
+          instant severity reaches its threshold, and exactly ₹0 one point below it — try the severity
+          slider across {INTERVENTIONS.find((i) => i.id === 'parametric-trigger')?.triggerSeverityThreshold}/100
+          with it enabled to see the cliff, which is the real tradeoff a buyer accepts for fast,
+          dispute-free payout instead of a slower indemnity claim.
         </p>
       </div>
     </div>

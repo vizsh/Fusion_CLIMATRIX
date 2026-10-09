@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { create } from 'zustand'
 import { computeHazardReach, REGION_HAZARD } from '../lib/graphAnalytics'
-import { combinedReductionShare, totalInterventionCost } from '../lib/interventions'
+import { combinedReductionShare, parametricPayout, totalInterventionCost } from '../lib/interventions'
 import { estimateRevenue, sectorVulnerability } from '../lib/sectorVulnerability'
 
 export type Hazard = 'Flood' | 'Drought' | 'Cyclone' | 'Heatwave' | 'Landslide'
@@ -284,6 +284,7 @@ export interface ImpactResult {
   incrementalEl: number // stressed - baseline (unmitigated)
   avoidedEl: number // stressed - mitigated
   interventionCostCr: number
+  parametricPayoutCr: number // fixed payout from any triggered parametric intervention, already folded into mitigatedEl
   bySector: SectorBreakdown[]
 }
 
@@ -368,7 +369,11 @@ export function computeImpact(state: {
 
   const incrementalEl = stressedEl - baselineEl
   const reduction = combinedReductionShare(state.interventions)
-  const mitigatedEl = baselineEl + incrementalEl * (1 - reduction)
+  const payoutCr = parametricPayout(state.interventions, state.severity)
+  // Payout offsets stress-induced loss only, never below the untressed
+  // baseline — a parametric trigger pays for the shock, not for ordinary
+  // credit risk the borrower already carried.
+  const mitigatedEl = Math.max(baselineEl, baselineEl + incrementalEl * (1 - reduction) - payoutCr)
   const avoidedEl = stressedEl - mitigatedEl
   const interventionCostCr = totalInterventionCost(state.interventions)
 
@@ -402,6 +407,7 @@ export function computeImpact(state: {
     incrementalEl,
     avoidedEl,
     interventionCostCr,
+    parametricPayoutCr: payoutCr,
     bySector: Array.from(bySectorMap.values()).sort((a, b) => b.stressedEl - a.stressedEl),
   }
 }
