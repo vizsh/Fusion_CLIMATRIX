@@ -4,6 +4,7 @@ from app.models.entities import (
     DependencyEdge,
     EvidenceRecord,
     HazardEvent,
+    NewsArticle,
     Organization,
     Portfolio,
     Position,
@@ -22,4 +23,5 @@ __all__ = [
     "EvidenceRecord",
     "ScenarioRun",
     "WeatherObservation",
+    "NewsArticle",
 ]

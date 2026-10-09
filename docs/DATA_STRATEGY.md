@@ -7,11 +7,32 @@ the connector interface and schema already in `backend/`.
 
 ## Where things stand after this pass
 
-- One real connector (NASA POWER) proves the pattern: `DataConnector.fetch()`
-  → normalize → `ConnectorResult` with an honest status
-  (`ok`/`unconfigured`/`error`/`mock`) → persisted with `source` +
-  `retrieved_at` → surfaced to the user with a source link, never a fake
-  "live" badge.
+Six real connectors now live behind the same `DataConnector.fetch()` →
+normalize → `ConnectorResult` (honest `ok`/`unconfigured`/`error`/`mock`
+status) → persisted with `source` + `retrieved_at` → surfaced with a source
+link pattern NASA POWER established:
+
+| Connector | What it adds | Where it surfaces |
+|---|---|---|
+| NASA POWER | Historical daily precipitation/temperature | Evidence & Reports "Live Data Check" |
+| Open-Meteo (archive) | Second independent historical reanalysis — automatic fallback if NASA POWER errors | Same endpoint, transparent fallback |
+| Open-Meteo (flood/GloFAS) | **Real river discharge (m³/s)** for the Beas corridor — the first genuinely hydrological (not just meteorological) signal in the product | Digital Twin "BEAS RIVER DISCHARGE" badge |
+| Tomorrow.io | Live current conditions (temp, humidity, rain intensity) — the "right now" complement to historical data | Digital Twin "NOW:" badge |
+| NewsAPI + GNews | Region/hazard-scoped real news search, NewsAPI primary with automatic GNews fallback | Evidence & Reports "Recent Developments" |
+| AlphaAI | Relevance-scored financial news search + reference-ticker SEC Form 4 insider summaries | Evidence & Reports "Market Intelligence" |
+
+Two things worth calling out from building these:
+
+- **Every connector that accepts a server-side API key had its `source_url`
+  checked for leaking that key back to the client** — Tomorrow.io, NewsAPI
+  and GNews all put the key in the query string, and the first pass of each
+  connector echoed `str(response.url)` straight back to the frontend.
+  Fixed by constructing a redacted display URL instead. AlphaAI was never
+  affected (it uses a Bearer header, not a query param) — worth noting as
+  the safer pattern for any future connector.
+- **Open-Meteo's flood API is forecast + a short recent window, not a deep
+  historical archive** — useful to know before trying to pull a 2023
+  discharge series the way the weather archive connectors can.
 - Backend and frontend IDs match 1:1 (`co-hp-auto`, `hz-hp`, …) — this is the
   single decision that makes every future connector additive instead of
   requiring an ID-reconciliation layer.
@@ -23,12 +44,7 @@ the connector interface and schema already in `backend/`.
 
 ## Next connectors, in order
 
-1. **Open-Meteo Historical Weather API** (free, no key, higher resolution
-   than NASA POWER for India, already referenced in the project's own FIN-04
-   doc). Implement as a second `DataConnector` alongside NASA POWER and let
-   the weather endpoint fall back between them — the first genuinely
-   multi-source connector, which is also the first real test of the
-   provider-adapter pattern actually paying off.
+1. ~~Open-Meteo Historical Weather API~~ — **done**, see table above.
 2. **OSM Overpass API** for real road/bridge/facility geometry. Right now
    every `infra`/`supplier` coordinate in the graph is a hand-placed point
    (`geo_confidence` would honestly be `centroid` for almost all of them).

@@ -66,6 +66,82 @@ export function queryWeather(lat: number, lng: number, start: string, end: strin
   })
 }
 
+export interface CurrentConditions {
+  observed_at: string
+  temperature_c: number | null
+  temperature_apparent_c: number | null
+  humidity_pct: number | null
+  precipitation_probability_pct: number | null
+  rain_intensity_mm_hr: number | null
+  wind_speed_m_s: number | null
+  wind_gust_m_s: number | null
+  visibility_km: number | null
+  weather_code: number | null
+  source: string
+  source_url: string
+  evidence_class: string
+}
+
+export function getCurrentConditions(lat: number, lng: number) {
+  return request<CurrentConditions>(`/api/weather/current?lat=${lat}&lng=${lng}`)
+}
+
+export interface FloodDay {
+  date: string
+  river_discharge_m3s: number | null
+}
+
+export interface FloodResult {
+  days: FloodDay[]
+  source: string
+  source_url: string
+  note: string
+  evidence_class: string
+}
+
+export function getFloodDischarge(lat: number, lng: number, pastDays = 7, forecastDays = 5) {
+  return request<FloodResult>(`/api/weather/flood?lat=${lat}&lng=${lng}&past_days=${pastDays}&forecast_days=${forecastDays}`)
+}
+
+export interface NewsArticle {
+  id: string
+  title: string
+  description: string
+  url: string
+  source_name: string
+  published_at: string
+  provider: string
+  relevance: number | null
+  category: string | null
+}
+
+export interface NewsResult {
+  articles: NewsArticle[]
+  provider: string
+  query: string
+  retrieved_at: string
+  evidence_class: string
+}
+
+export function searchNews(q: string) {
+  return request<NewsResult>(`/api/news/search?q=${encodeURIComponent(q)}`)
+}
+
+export function searchMarketNews(q: string, minRelevance = 1) {
+  return request<NewsResult>(`/api/news/market?q=${encodeURIComponent(q)}&min_relevance=${minRelevance}`)
+}
+
+export interface InsiderSummary {
+  ticker: string
+  raw: Record<string, unknown>
+  source: string
+  note: string
+}
+
+export function getInsiderSummary(ticker: string) {
+  return request<InsiderSummary>(`/api/market/insider/${encodeURIComponent(ticker)}`)
+}
+
 export interface PortfolioSummary {
   id: string
   name: string

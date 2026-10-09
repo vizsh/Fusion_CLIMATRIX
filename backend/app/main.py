@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import companies, evidence, portfolios, scenarios, weather
+from app.api import companies, evidence, news, portfolios, scenarios, weather
 from app.config import settings
 from app.db.session import Base, engine
 
@@ -27,6 +27,7 @@ app.include_router(companies.router)
 app.include_router(scenarios.router)
 app.include_router(weather.router)
 app.include_router(evidence.router)
+app.include_router(news.router)
 
 
 @app.get("/api/health")

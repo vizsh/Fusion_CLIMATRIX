@@ -133,3 +133,60 @@ class WeatherQueryResult(BaseModel):
     retrieved_at: datetime
     cached: bool
     evidence_class: str = "sourced"
+
+
+class CurrentConditionsOut(BaseModel):
+    observed_at: str
+    temperature_c: float | None
+    temperature_apparent_c: float | None
+    humidity_pct: float | None
+    precipitation_probability_pct: float | None
+    rain_intensity_mm_hr: float | None
+    wind_speed_m_s: float | None
+    wind_gust_m_s: float | None
+    visibility_km: float | None
+    weather_code: int | None
+    source: str = "Tomorrow.io"
+    source_url: str
+    evidence_class: str = "sourced"
+
+
+class FloodDayOut(BaseModel):
+    date: str
+    river_discharge_m3s: float | None
+
+
+class FloodQueryResult(BaseModel):
+    days: list[FloodDayOut]
+    source: str = "Open-Meteo / GloFAS"
+    source_url: str
+    note: str
+    evidence_class: str = "sourced"
+
+
+class NewsArticleOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    title: str
+    description: str
+    url: str
+    source_name: str
+    published_at: str
+    provider: str
+    relevance: float | None = None
+    category: str | None = None
+
+
+class NewsQueryResult(BaseModel):
+    articles: list[NewsArticleOut]
+    provider: str
+    query: str
+    retrieved_at: datetime
+    evidence_class: str = "sourced"
+
+
+class InsiderSummaryResult(BaseModel):
+    ticker: str
+    raw: dict
+    source: str = "AlphaAI"
+    note: str = "Reference real-market data for a comparable listed company — not connected to any synthetic CLIMATRIX company record."

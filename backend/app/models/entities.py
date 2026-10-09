@@ -153,17 +153,40 @@ class ScenarioRun(Base):
 
 
 class WeatherObservation(Base):
-    """Real external data, populated by the NASA POWER connector —
-    see app/connectors/nasa_power.py. Distinct from HazardEvent: this is an
-    observed historical meteorological record, not a hazard/scenario entity."""
+    """Real external data, populated by the NASA POWER / Open-Meteo
+    connectors. Distinct from HazardEvent: this is an observed historical
+    meteorological record, not a hazard/scenario entity. `source`
+    distinguishes which provider answered (both are real, independent
+    reanalysis models — kept separate rather than averaged together)."""
 
     __tablename__ = "weather_observations"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     lat: Mapped[float] = mapped_column(Float)
     lng: Mapped[float] = mapped_column(Float)
-    date: Mapped[str] = mapped_column(String)  # YYYYMMDD, as returned by NASA POWER
+    date: Mapped[str] = mapped_column(String)  # YYYYMMDD
     precipitation_mm: Mapped[float | None] = mapped_column(Float, nullable=True)
     temp_c_avg: Mapped[float | None] = mapped_column(Float, nullable=True)
     source: Mapped[str] = mapped_column(String, default="NASA POWER")
+    retrieved_at: Mapped[datetime] = mapped_column(default=_now)
+
+
+class NewsArticle(Base):
+    """Real articles fetched live from NewsAPI/GNews/AlphaAI. `query` records
+    what search produced this row (region/hazard keywords, not a company —
+    see docs/DATA_STRATEGY.md on not blending synthetic companies with real
+    news as if it were company-specific coverage)."""
+
+    __tablename__ = "news_articles"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    query: Mapped[str] = mapped_column(String, index=True)
+    title: Mapped[str] = mapped_column(Text)
+    description: Mapped[str] = mapped_column(Text, default="")
+    url: Mapped[str] = mapped_column(Text)
+    source_name: Mapped[str] = mapped_column(String, default="")
+    published_at: Mapped[str] = mapped_column(String, default="")
+    provider: Mapped[str] = mapped_column(String)  # NewsAPI | GNews | AlphaAI
+    relevance: Mapped[float | None] = mapped_column(Float, nullable=True)  # AlphaAI only
+    category: Mapped[str | None] = mapped_column(String, nullable=True)  # AlphaAI only
     retrieved_at: Mapped[datetime] = mapped_column(default=_now)

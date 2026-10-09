@@ -32,6 +32,7 @@ import {
 } from '../lib/digitalTwinMap'
 import { cleanDistrictName, getDistrictRisk } from '../lib/districtRisk'
 import { computeFloodRibbon, loadElevationSampler, type ElevationSampler } from '../lib/floodModel'
+import { CurrentConditionsBadge, RiverDischargeBadge } from '../components/LiveConditionsBadges'
 import { graphStages, REGION_HAZARD } from '../lib/graphAnalytics'
 import { KIND_META, NODES, type NodeKind } from '../lib/indiaGraphData'
 import { useScenarioStore, type Region } from '../store/useScenarioStore'
@@ -79,6 +80,7 @@ export default function DigitalTwinPage() {
   const [elevationStatus, setElevationStatus] = useState<'loading' | 'ready' | 'error'>('loading')
 
   const simulated = runState !== 'idle'
+  const activeHazardNode = NODES.find((n) => n.id === REGION_HAZARD[region])
 
   // Decode the real DEM tiles once — used both by the 3D terrain (already
   // handled by MapLibre natively) and by our own flood-ribbon computation.
@@ -404,6 +406,12 @@ export default function DigitalTwinPage() {
                   ? 'DEM UNAVAILABLE — ILLUSTRATIVE EXTENT'
                   : 'LOADING ELEVATION DATA…'}
             </div>
+          )}
+          {activeHazardNode?.coords && (
+            <CurrentConditionsBadge lat={activeHazardNode.coords[1]} lng={activeHazardNode.coords[0]} />
+          )}
+          {region === 'HP' && activeHazardNode?.coords && (
+            <RiverDischargeBadge lat={activeHazardNode.coords[1]} lng={activeHazardNode.coords[0]} />
           )}
         </div>
 

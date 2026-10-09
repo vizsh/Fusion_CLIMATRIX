@@ -1,5 +1,6 @@
 import { ChevronDown, Download } from 'lucide-react'
 import { useState } from 'react'
+import LiveNewsPanel from '../components/LiveNewsPanel'
 import LiveWeatherPanel from '../components/LiveWeatherPanel'
 import PageHeader from '../components/PageHeader'
 import { EVIDENCE_META, type EvidenceClass } from '../lib/evidence'
@@ -154,8 +155,9 @@ export default function EvidenceReportsPage() {
       />
 
       <div className="bg-grid p-6">
-        <div className="mb-6 max-w-3xl">
+        <div className="mb-6 grid max-w-5xl grid-cols-1 gap-4 lg:grid-cols-2">
           <LiveWeatherPanel />
+          <LiveNewsPanel />
         </div>
 
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
