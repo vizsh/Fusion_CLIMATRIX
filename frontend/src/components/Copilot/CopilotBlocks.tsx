@@ -22,7 +22,15 @@ function EvidenceDot({ cls }: { cls?: EvidenceClass }) {
   )
 }
 
-export function CopilotBlockView({ block, onAction }: { block: CopilotBlock; onAction: (a: CopilotAction) => void }) {
+export function CopilotBlockView({
+  block,
+  onAction,
+  onSuggest,
+}: {
+  block: CopilotBlock
+  onAction: (a: CopilotAction) => void
+  onSuggest?: (text: string) => void
+}) {
   switch (block.kind) {
     case 'text':
       return <p className="text-[12.5px] leading-relaxed text-slate-300">{block.text}</p>
@@ -135,6 +143,21 @@ export function CopilotBlockView({ block, onAction }: { block: CopilotBlock; onA
               className="rounded border border-cyan/35 bg-cyan/10 px-2.5 py-1 font-mono text-[10px] tracking-wide text-cyan transition-colors hover:bg-cyan/20"
             >
               {a.label}
+            </button>
+          ))}
+        </div>
+      )
+
+    case 'suggestions':
+      return (
+        <div className="flex flex-wrap gap-1.5 border-t border-line/60 pt-2">
+          {block.prompts.map((p, i) => (
+            <button
+              key={i}
+              onClick={() => onSuggest?.(p)}
+              className="rounded-full border border-line bg-panel/60 px-2.5 py-1 font-mono text-[9.5px] leading-tight text-slate-400 transition-colors hover:border-cyan/30 hover:text-cyan"
+            >
+              {p}
             </button>
           ))}
         </div>

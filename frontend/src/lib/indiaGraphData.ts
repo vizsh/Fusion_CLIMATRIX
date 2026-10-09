@@ -26,7 +26,7 @@ export interface GNode {
   id: string
   label: string
   kind: NodeKind
-  region?: 'HP' | 'KL' | 'MH' | 'UK' | 'National'
+  region?: 'HP' | 'KL' | 'MH' | 'UK' | 'MB' | 'National'
   sector?: string
   note?: string
   coords?: [number, number] // [lng, lat]
@@ -187,6 +187,69 @@ export const NODES: GNode[] = [
     note: 'Illustrative of the real PMFBY scheme’s structure — a central/state subsidy covers most of the actuarial premium so the insured grower pays only a small flat share. This is a disclosed simplification, not official scheme data; see docs/DATA_STRATEGY.md.',
   },
 
+  // ---- Mumbai Metropolitan Region: urban monsoon flooding ----------------
+  // Mumbai's suburban rail network and the Mithi River's overflow were the
+  // documented center of the 26 July 2005 deluge (and recur most monsoons
+  // since — 2017, 2019, 2021); this anchors a financial-hub scenario rather
+  // than an agricultural/infrastructure one, since Mumbai houses this
+  // graph's own banks and insurer. Place names are real; company identities
+  // below (co-mb-*) are synthetic, same convention as the rest of the file.
+  {
+    id: 'hz-mb',
+    label: 'Mumbai — Urban Monsoon Flood (2005 deluge anchor)',
+    kind: 'hazard',
+    region: 'MB',
+    coords: [72.8777, 19.076],
+    note: 'Retrospective scenario anchor · 26 July 2005 Mumbai deluge; comparable waterlogging recurs most monsoons (2017, 2019, 2021).',
+  },
+  { id: 'infra-mb-rail', label: 'Mumbai Suburban Railway (Western & Central Lines)', kind: 'infra', region: 'MB', sector: 'Rail', coords: [72.8296, 19.0544] },
+  { id: 'infra-mb-mithi', label: 'Mithi River & Drainage Network', kind: 'infra', region: 'MB', sector: 'Drainage', coords: [72.8656, 19.0819] },
+  { id: 'infra-mb-bkc', label: 'Bandra–Kurla Complex Access Roads', kind: 'infra', region: 'MB', sector: 'Road', coords: [72.8656, 19.0661] },
+  { id: 'infra-mb-port', label: 'JNPT–Mumbai Port Access Corridor', kind: 'infra', region: 'MB', sector: 'Port', coords: [72.9489, 18.9489] },
+
+  {
+    id: 'co-mb-bfsi',
+    label: 'Marine Lines Capital Markets Ltd.',
+    kind: 'company',
+    region: 'MB',
+    sector: 'BFSI / Capital Markets',
+    coords: [72.8311, 18.9475],
+    eadCr: 280,
+    baselinePd: 0.015,
+    baselineLgd: 0.3,
+    annualRevenueCr: 410,
+    sumInsuredCr: 200,
+    premiumRateBps: 140,
+    deductiblePct: 0.1,
+    note: 'Fictional capital-markets/broking firm — office-based BFSI exposure, not a physical-asset-heavy borrower.',
+  },
+  {
+    id: 'co-mb-realty',
+    label: 'BKC Commercial Realty Trust',
+    kind: 'company',
+    region: 'MB',
+    sector: 'Real Estate / REIT',
+    coords: [72.8656, 19.0661],
+    eadCr: 320,
+    baselinePd: 0.02,
+    baselineLgd: 0.35,
+    sumInsuredCr: 250,
+    premiumRateBps: 200,
+    deductiblePct: 0.1,
+  },
+  {
+    id: 'co-mb-port',
+    label: 'JNPT Container Terminal Services',
+    kind: 'company',
+    region: 'MB',
+    sector: 'Port & Shipping',
+    coords: [72.9489, 18.9489],
+    eadCr: 260,
+    baselinePd: 0.017,
+    baselineLgd: 0.32,
+    note: 'Deliberately uninsured in this graph, like most of the port/logistics sector elsewhere — keeps the protection-gap finding genuine.',
+  },
+
   // ---- Flagship: Uttarakhand construction company (bank + investor scenario) ----
   {
     id: 'hz-uk',
@@ -316,6 +379,34 @@ export const EDGES: GEdge[] = [
   { id: 'i-hpagri-pmfby', from: 'co-hp-agri', to: 'insurer-2', type: 'INSURED_BY', evidence: 'synthetic', weight: 1 },
   { id: 'i-mhcotton-pmfby', from: 'co-mh-cotton', to: 'insurer-2', type: 'INSURED_BY', evidence: 'synthetic', weight: 1 },
   { id: 'i-mhdairy-pmfby', from: 'co-mh-dairy', to: 'insurer-2', type: 'INSURED_BY', evidence: 'synthetic', weight: 1 },
+
+  // Mumbai: hazard -> infra (documented flood mechanism) -> companies/institutions
+  { id: 'e-hz-mb-rail', from: 'hz-mb', to: 'infra-mb-rail', type: 'AFFECTED_BY', evidence: 'sourced', weight: 3 },
+  { id: 'e-hz-mb-mithi', from: 'hz-mb', to: 'infra-mb-mithi', type: 'AFFECTED_BY', evidence: 'sourced', weight: 3 },
+  { id: 'e-hz-mb-bkc', from: 'hz-mb', to: 'infra-mb-bkc', type: 'AFFECTED_BY', evidence: 'modelled', weight: 2 },
+  { id: 'e-hz-mb-port', from: 'hz-mb', to: 'infra-mb-port', type: 'AFFECTED_BY', evidence: 'sourced', weight: 2 },
+
+  // Rail disruption is a workforce/commute dependency, not a physical-asset
+  // one — affects office-based BFSI and IT operations across the city.
+  { id: 'e-mbrail-bfsi', from: 'infra-mb-rail', to: 'co-mb-bfsi', type: 'DEPENDS_ON', evidence: 'modelled', weight: 2 },
+  { id: 'e-mbrail-it', from: 'infra-mb-rail', to: 'co-generic-it', type: 'DEPENDS_ON', evidence: 'modelled', weight: 2 },
+
+  { id: 'e-mbmithi-realty', from: 'infra-mb-mithi', to: 'co-mb-realty', type: 'DEPENDS_ON', evidence: 'modelled', weight: 3 },
+  { id: 'e-mbmithi-fmcg', from: 'infra-mb-mithi', to: 'co-generic-fmcg', type: 'DEPENDS_ON', evidence: 'modelled', weight: 2 },
+
+  { id: 'e-mbbkc-bfsi', from: 'infra-mb-bkc', to: 'co-mb-bfsi', type: 'DEPENDS_ON', evidence: 'modelled', weight: 3 },
+  { id: 'e-mbbkc-realty', from: 'infra-mb-bkc', to: 'co-mb-realty', type: 'DEPENDS_ON', evidence: 'modelled', weight: 2 },
+
+  { id: 'e-mbport-port', from: 'infra-mb-port', to: 'co-mb-port', type: 'DEPENDS_ON', evidence: 'modelled', weight: 3 },
+  { id: 'e-mbport-genlog', from: 'infra-mb-port', to: 'co-generic-logistics', type: 'DEPENDS_ON', evidence: 'modelled', weight: 3 },
+  { id: 'f-mbport-govt1', from: 'infra-mb-port', to: 'govt-1', type: 'FINANCED_BY', evidence: 'synthetic', weight: 2 },
+
+  { id: 'f-mbbfsi-bank1', from: 'co-mb-bfsi', to: 'bank-1', type: 'FINANCED_BY', evidence: 'synthetic', weight: 3 },
+  { id: 'f-mbrealty-bank2', from: 'co-mb-realty', to: 'bank-2', type: 'FINANCED_BY', evidence: 'synthetic', weight: 3 },
+  { id: 'f-mbport-bank1', from: 'co-mb-port', to: 'bank-1', type: 'FINANCED_BY', evidence: 'synthetic', weight: 2 },
+
+  { id: 'i-mbbfsi', from: 'co-mb-bfsi', to: 'insurer-1', type: 'INSURED_BY', evidence: 'synthetic', weight: 1 },
+  { id: 'i-mbrealty', from: 'co-mb-realty', to: 'insurer-1', type: 'INSURED_BY', evidence: 'synthetic', weight: 1 },
 
   // Uttarakhand flagship: hazard -> road/bridge -> supplier/company -> bank
   { id: 'e-hz-uk-road', from: 'hz-uk', to: 'infra-uk-road', type: 'AFFECTED_BY', evidence: 'assumption', weight: 3 },

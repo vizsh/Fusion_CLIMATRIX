@@ -9,7 +9,7 @@ import {
   type Substitutability,
 } from '../store/useScenarioStore'
 
-const REGIONS: Region[] = ['HP', 'KL', 'MH', 'UK']
+const REGIONS: Region[] = ['HP', 'KL', 'MH', 'UK', 'MB']
 const HAZARDS: Hazard[] = ['Flood', 'Drought', 'Cyclone', 'Heatwave', 'Landslide']
 const SUBS: Substitutability[] = ['Limited', 'Moderate', 'Strong']
 const PROFILES: ScenarioProfile[] = ['Baseline', 'Moderate', 'Severe', 'Compound']

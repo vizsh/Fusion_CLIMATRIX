@@ -12,7 +12,7 @@ import { CopilotBlockView } from '../components/Copilot/CopilotBlocks'
 import type { CopilotBlock } from '../lib/copilot/types'
 import { REGION_LABEL, useScenarioStore, type Region } from '../store/useScenarioStore'
 
-const REGIONS: Region[] = ['HP', 'KL', 'MH', 'UK']
+const REGIONS: Region[] = ['HP', 'KL', 'MH', 'UK', 'MB']
 const HORIZONS: Horizon[] = ['near', 'medium', 'long', 'both']
 
 function fmtCr(n: number) {

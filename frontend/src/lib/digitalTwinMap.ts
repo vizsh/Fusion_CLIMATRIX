@@ -69,12 +69,13 @@ export interface CameraPreset {
   bearing: number
 }
 
-export const CAMERA_PRESETS: Record<'india' | 'HP' | 'KL' | 'MH' | 'UK' | 'valley', CameraPreset> = {
+export const CAMERA_PRESETS: Record<'india' | 'HP' | 'KL' | 'MH' | 'UK' | 'MB' | 'valley', CameraPreset> = {
   india: { label: 'India', center: [79, 22.5], zoom: 4.2, pitch: 0, bearing: 0 },
   HP: { label: 'Himachal Pradesh', center: [77.05, 31.85], zoom: 7.6, pitch: 45, bearing: -12 },
   KL: { label: 'Kerala', center: [76.4, 10.3], zoom: 7.3, pitch: 40, bearing: 0 },
   MH: { label: 'Marathwada', center: [76.4, 18.9], zoom: 7.3, pitch: 35, bearing: 0 },
   UK: { label: 'Chamoli–Joshimath Corridor', center: [79.55, 30.5], zoom: 9.6, pitch: 62, bearing: -20 },
+  MB: { label: 'Mumbai Metropolitan Region', center: [72.88, 19.03], zoom: 10.2, pitch: 50, bearing: -8 },
   valley: { label: 'Kullu–Manali Valley', center: [77.16, 32.05], zoom: 10.6, pitch: 66, bearing: 18 },
 }
 
@@ -84,6 +85,10 @@ export const GEO_FILE_BY_REGION: Partial<Record<Region, string>> = {
   HP: '/geo/himachal_pradesh.geojson',
   KL: '/geo/kerala.geojson',
   MH: '/geo/maharashtra.geojson',
+  // Same statewide district file as MH — Mumbai City/Suburban are districts
+  // within it. MB's camera preset zooms to the city; districtRisk.ts scores
+  // these specific districts for flood risk instead of MH's drought scores.
+  MB: '/geo/maharashtra.geojson',
 }
 
 // Illustrative landslide-susceptibility zone around the Chamoli-Joshimath
@@ -145,6 +150,7 @@ export const REGION_BBOX: Record<Region, [number, number, number, number]> = {
   KL: [10.05, 76.2, 10.55, 76.6],
   MH: [18.6, 76.1, 19.2, 76.7],
   UK: [30.25, 79.3, 30.75, 79.8],
+  MB: [18.88, 72.75, 19.3, 73.05],
 }
 
 // The NH-5 corridor spine, used to render the "disrupted route" line.

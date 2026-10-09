@@ -205,7 +205,7 @@ function CompanyStats({ node, onSelect }: { node: GNode; onSelect?: (id: string)
         ) : (
           <>
             Not reachable from the active scenario ({REGION_LABEL[scenario.region]} ·{' '}
-            {scenario.hazard}). {hazards.length > 0 ? `This company is exposed to: ${hazards.map((h) => REGION_LABEL[h.region as 'HP' | 'KL' | 'MH' | 'UK']).join(', ')} — switch the region in the Scenario console above to see it stressed.` : pathSentence}
+            {scenario.hazard}). {hazards.length > 0 ? `This company is exposed to: ${hazards.map((h) => REGION_LABEL[h.region as 'HP' | 'KL' | 'MH' | 'UK' | 'MB']).join(', ')} — switch the region in the Scenario console above to see it stressed.` : pathSentence}
           </>
         )}
       </ScenarioBanner>

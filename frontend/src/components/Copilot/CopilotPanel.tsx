@@ -8,19 +8,19 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Bot, Send, Sparkles, X } from 'lucide-react'
+import { Radar, Send, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useScenarioStore } from '../../store/useScenarioStore'
-import { downloadBrief, generateWhatIf } from '../../lib/copilot/engine'
+import { downloadBrief, downloadPortfolioBrief, generatePortfolioOverview, generateWhatIf } from '../../lib/copilot/engine'
 import { respondTo } from '../../lib/copilot/respond'
 import type { CopilotAction, CopilotTurn } from '../../lib/copilot/types'
 import { CopilotBlockView } from './CopilotBlocks'
 
 const SUGGESTIONS = [
-  'Which holdings are exposed to risky transport routes in Himachal Pradesh?',
-  'Automatically test the most relevant scenarios for Kerala',
+  'Analyse my portfolio and give me the risks',
+  "What if there's a severe flood in Mumbai?",
+  'Guide me to the map and show live movement',
   'Which exposures may be uninsured?',
-  'How could this scenario affect earnings and cash flow?',
 ]
 
 let turnSeq = 0
@@ -40,7 +40,7 @@ export default function CopilotPanel() {
         { kind: 'heading', text: 'CLIMATRIX AI Copilot' },
         {
           kind: 'text',
-          text: "Ask me about exposure, dependencies, insurance or financial impact, or ask me to test scenarios automatically. I read and operate the same live scenario state as the dashboard — nothing I say will disagree with what's on screen.",
+          text: "Ask me to analyse your whole portfolio, run a what-if scenario anywhere in the graph, check insurance or compliance, or guide you to the live map. I read and operate the same live scenario state as the dashboard — nothing I say will disagree with what's on screen, and I never invent a number.",
         },
       ],
     },
@@ -53,6 +53,13 @@ export default function CopilotPanel() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [turns, open])
 
+  function applyDials(action: CopilotAction) {
+    if (action.region) state.setRegion(action.region)
+    if (action.severity !== undefined) state.setSeverity(action.severity)
+    if (action.durationMonths !== undefined) state.setDuration(action.durationMonths)
+    if (action.substitutability) state.setSubstitutability(action.substitutability)
+  }
+
   function runAction(action: CopilotAction) {
     switch (action.kind) {
       case 'navigate':
@@ -60,14 +67,26 @@ export default function CopilotPanel() {
         if (action.to) navigate(action.to)
         break
       case 'apply-scenario':
-        if (action.region) state.setRegion(action.region)
-        if (action.severity !== undefined) state.setSeverity(action.severity)
-        if (action.durationMonths !== undefined) state.setDuration(action.durationMonths)
-        if (action.substitutability) state.setSubstitutability(action.substitutability)
+        applyDials(action)
         navigate('/scenario')
+        break
+      case 'go-to-map':
+        // Navigate AND start the simulation clock — "guide me to the map
+        // and show me live movement" in one click, per the brief's request
+        // that the chatbot operate the dashboard, not just describe it.
+        applyDials(action)
+        navigate('/twin')
+        state.run()
+        break
+      case 'run-simulation':
+        applyDials(action)
+        state.run()
         break
       case 'download-brief':
         if (action.briefRegion) downloadBrief(generateWhatIf(action.briefRegion, 'medium'))
+        break
+      case 'download-portfolio-brief':
+        downloadPortfolioBrief(generatePortfolioOverview())
         break
       case 'select-entity':
         if (action.entityId) state.setSelectedEntity(action.entityId)
@@ -101,7 +120,7 @@ export default function CopilotPanel() {
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan/60" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-cyan" />
             </span>
-            <Bot size={16} className="text-cyan" />
+            <Radar size={16} className="text-cyan" />
             <span className="font-mono text-[10.5px] tracking-wide text-slate-200">AI COPILOT</span>
           </motion.button>
         )}
@@ -120,7 +139,7 @@ export default function CopilotPanel() {
             <div className="flex shrink-0 items-center justify-between border-b border-line bg-panel-2/70 px-3.5 py-2.5">
               <div className="flex items-center gap-2">
                 <div className="flex h-6 w-6 items-center justify-center rounded border border-cyan/30 bg-cyan/[0.1]">
-                  <Sparkles size={12} className="text-cyan" />
+                  <Radar size={12} className="text-cyan" />
                 </div>
                 <div>
                   <div className="font-mono text-[11px] font-semibold tracking-wide text-white">CLIMATRIX COPILOT</div>
@@ -143,7 +162,9 @@ export default function CopilotPanel() {
                 ) : (
                   <div key={turn.id} className="flex justify-start">
                     <div className="max-w-[92%] space-y-2 rounded-lg rounded-tl-sm border border-line bg-panel-2/50 px-3 py-2.5">
-                      {turn.blocks?.map((b, i) => <CopilotBlockView key={i} block={b} onAction={runAction} />)}
+                      {turn.blocks?.map((b, i) => (
+                        <CopilotBlockView key={i} block={b} onAction={runAction} onSuggest={(t) => send(t)} />
+                      ))}
                     </div>
                   </div>
                 ),

@@ -6,7 +6,7 @@ import { estimateRevenue, sectorVulnerability } from '../lib/sectorVulnerability
 
 export type Hazard = 'Flood' | 'Drought' | 'Cyclone' | 'Heatwave' | 'Landslide'
 export type Substitutability = 'Limited' | 'Moderate' | 'Strong'
-export type Region = 'HP' | 'KL' | 'MH' | 'UK'
+export type Region = 'HP' | 'KL' | 'MH' | 'UK' | 'MB'
 export type RunState = 'idle' | 'running' | 'paused' | 'done'
 export type UserMode = 'bank' | 'investor'
 export type ScenarioProfile = 'Baseline' | 'Moderate' | 'Severe' | 'Compound'
@@ -16,6 +16,7 @@ export const REGION_LABEL: Record<Region, string> = {
   KL: 'Kerala',
   MH: 'Agricultural Belt (Drought)',
   UK: 'Uttarakhand (Construction)',
+  MB: 'Mumbai Metropolitan Region',
 }
 
 export const REGION_DEFAULT_HAZARD: Record<Region, Hazard> = {
@@ -23,6 +24,7 @@ export const REGION_DEFAULT_HAZARD: Record<Region, Hazard> = {
   KL: 'Flood',
   MH: 'Drought',
   UK: 'Landslide',
+  MB: 'Flood',
 }
 
 // "Ordinary conditions" through to catastrophic — severity/duration presets

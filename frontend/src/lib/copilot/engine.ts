@@ -292,6 +292,70 @@ export function buildBriefText(ranked: RankedWhatIf): string {
   return lines.join('\n')
 }
 
+export const ALL_REGIONS: Region[] = ['HP', 'KL', 'MH', 'UK', 'MB']
+
+export interface RegionRisk {
+  region: Region
+  label: string
+  impact: ImpactResult
+  protectionGap: ProtectionGapResult
+  portfolioShareOfTotal: number
+}
+
+export interface PortfolioOverview {
+  totalEADCr: number
+  regions: RegionRisk[]
+  /** Sorted descending by stressed EL under a common "Severe" stress test —
+   * an apples-to-apples comparison across regions, not each region's own
+   * preferred profile. */
+  byLoss: RegionRisk[]
+  bottlenecks: ReturnType<typeof computeBottlenecks>
+  portfolioProtectionGapShare: number
+}
+
+// A common stress level applied identically to every region so regions can
+// be ranked against each other on equal footing — using each region's own
+// saved scenario would make "which region is riskiest" an artifact of
+// whatever dial a user last left it on.
+const PORTFOLIO_SCAN_SEVERITY = 80
+const PORTFOLIO_SCAN_DURATION = 6
+
+/** "Analyse my portfolio" — the autonomous, no-single-region-selected
+ * entry point. Runs computeImpact/computeProtectionGap once per region
+ * (an internal multi-query fan-out, not a single lookup) and ranks the
+ * whole book by where the real concentration sits. */
+export function generatePortfolioOverview(): PortfolioOverview {
+  const totalEADCr = ALL_REGIONS.reduce((sum, r) => sum + hazardPortfolioStats(REGION_HAZARD[r]).eadCr, 0) || 1
+  const regions: RegionRisk[] = ALL_REGIONS.map((region) => {
+    const impact = computeImpact({
+      region,
+      severity: PORTFOLIO_SCAN_SEVERITY,
+      durationMonths: PORTFOLIO_SCAN_DURATION,
+      substitutability: 'Moderate',
+      interventions: [],
+    })
+    const protectionGap = computeProtectionGap(REGION_HAZARD[region], PORTFOLIO_SCAN_SEVERITY, PORTFOLIO_SCAN_DURATION)
+    return {
+      region,
+      label: REGION_LABEL[region],
+      impact,
+      protectionGap,
+      portfolioShareOfTotal: impact.eadCr / totalEADCr,
+    }
+  })
+
+  const totalUninsured = regions.reduce((s, r) => s + r.protectionGap.uninsuredEADCr, 0)
+  const totalExposedUnderGap = regions.reduce((s, r) => s + r.protectionGap.exposedEADCr, 0) || 1
+
+  return {
+    totalEADCr,
+    regions,
+    byLoss: [...regions].sort((a, b) => b.impact.stressedEl - a.impact.stressedEl),
+    bottlenecks: computeBottlenecks(6),
+    portfolioProtectionGapShare: totalUninsured / totalExposedUnderGap,
+  }
+}
+
 export function downloadBrief(ranked: RankedWhatIf) {
   const text = buildBriefText(ranked)
   const blob = new Blob([text], { type: 'text/plain' })
@@ -299,6 +363,48 @@ export function downloadBrief(ranked: RankedWhatIf) {
   const a = document.createElement('a')
   a.href = url
   a.download = `climatrix-scenario-brief-${ranked.region}.txt`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+export function buildPortfolioBriefText(overview: PortfolioOverview): string {
+  const lines: string[] = [
+    'CLIMATRIX INDIA — PORTFOLIO CLIMATE RISK BRIEF',
+    `Generated: ${new Date().toISOString()}`,
+    `Common stress test applied to every region: severity ${PORTFOLIO_SCAN_SEVERITY}/100, ${PORTFOLIO_SCAN_DURATION}mo — for cross-region ranking only, not each region's own saved scenario.`,
+    '',
+    '— EXECUTIVE SUMMARY —',
+    `Total exposed EAD across all tracked regions: ₹${overview.totalEADCr.toFixed(0)} cr.`,
+    `Highest-loss region under a common stress test: ${overview.byLoss[0].label} (₹${overview.byLoss[0].impact.stressedEl.toFixed(1)} cr stressed EL).`,
+    `Portfolio-wide protection gap: ${(overview.portfolioProtectionGapShare * 100).toFixed(0)}% of exposed EAD across all regions carries zero coverage.`,
+    '',
+    '— REGION RANKING (BY STRESSED EL, COMMON SCENARIO) —',
+    ...overview.byLoss.map(
+      (r, i) =>
+        `${i + 1}. ${r.label} — ₹${r.impact.stressedEl.toFixed(1)} cr stressed EL, ${r.impact.companyCount} holdings, ` +
+        `${(r.portfolioShareOfTotal * 100).toFixed(1)}% of total portfolio EAD, protection gap ${(r.protectionGap.protectionGapShare * 100).toFixed(0)}%.`,
+    ),
+    '',
+    '— CROSS-PORTFOLIO HIDDEN CONCENTRATION —',
+    ...overview.bottlenecks
+      .slice(0, 5)
+      .map((b) => `- ${b.node.label}: reaches ${b.reachedCompanies.length} holdings across the graph, ₹${b.reachedEAD.toFixed(0)} cr combined EAD`),
+    '',
+    '— EVIDENCE REGISTER —',
+    '- Region ranking: modelled, from this app’s ECL and protection-gap formulas under one common, disclosed stress level.',
+    '- Company identities, loan exposures, insurance terms: synthetic demonstration data.',
+    '- This brief is a cross-region screening tool — re-run What-If Analysis on the top-ranked region(s) for the full scenario comparison.',
+  ]
+  return lines.join('\n')
+}
+
+export function downloadPortfolioBrief(overview: PortfolioOverview) {
+  const text = buildPortfolioBriefText(overview)
+  const blob = new Blob([text], { type: 'text/plain' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'climatrix-portfolio-risk-brief.txt'
   a.click()
   URL.revokeObjectURL(url)
 }

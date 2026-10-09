@@ -67,7 +67,7 @@ hand-placed points. Click any asset to trace its dependency chain live.
 
 <img src="docs/images/dependency-explorer.jpg" width="100%">
 
-A 51-node, 74-edge exposure graph (hazard → infrastructure → supplier →
+A 60-node, 95-edge exposure graph (hazard → infrastructure → supplier →
 company → bank/insurer) laid out with `dagre` and rendered in `@xyflow/react`.
 Changing region, hazard or severity **immediately** re-highlights exactly
 which nodes the new scenario reaches and updates a live impact panel —
@@ -211,7 +211,7 @@ the "why does this matter" case is made before any dial is touched.
 ```mermaid
 flowchart LR
     subgraph Frontend["Frontend — Vite + React 19 + TypeScript"]
-        Graph["indiaGraphData.ts\n51 nodes · 74 edges"]
+        Graph["indiaGraphData.ts\n60 nodes · 95 edges"]
         Store["useScenarioStore\n(Zustand) — single source of truth"]
         Engine["Financial engine\nstressPdLgd · computeImpact\ncomputeEquityImpact · insurance.ts"]
         Pages["9 pages: Command Centre, Digital Twin,\nDependency Explorer, Portfolio Impact,\nMitigation Studio, Insurance & Protection Gap,\nCompany Investigation, Scenario Lab, Evidence & Reports"]

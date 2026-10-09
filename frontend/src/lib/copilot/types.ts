@@ -1,7 +1,20 @@
 import type { EvidenceClass } from '../evidence'
 import type { Hazard, Region, Substitutability } from '../../store/useScenarioStore'
 
-export type CopilotActionKind = 'navigate' | 'apply-scenario' | 'download-brief' | 'select-entity'
+export type CopilotActionKind =
+  | 'navigate'
+  | 'apply-scenario'
+  | 'download-brief'
+  | 'download-portfolio-brief'
+  | 'select-entity'
+  /** Navigates to the Digital Twin for a region AND starts the simulation
+   * clock running — the "guide me to the map and show me live movement"
+   * request: one click does both instead of the user hunting for the
+   * region switch and the run button separately. */
+  | 'go-to-map'
+  /** Starts (or restarts) the active scenario's run without leaving the
+   * current page — "run the simulation" as a direct command. */
+  | 'run-simulation'
 
 export interface CopilotAction {
   id: string
@@ -32,6 +45,9 @@ export type CopilotBlock =
     }
   | { kind: 'table'; headers: string[]; rows: string[][] }
   | { kind: 'actions'; actions: CopilotAction[] }
+  /** Quick-reply follow-up prompts — clicking one sends it as the next
+   * message, same as typing it, so a reply can suggest where to dig next. */
+  | { kind: 'suggestions'; prompts: string[] }
 
 export interface CopilotTurn {
   id: string

@@ -85,9 +85,26 @@ const RISK: Record<string, Record<string, number>> = {
     GADCHIROLI: 26,
     BHANDARA: 27,
   },
+  // Mumbai Metropolitan Region — same underlying Maharashtra district
+  // boundaries as MH above, but scored for urban monsoon flood risk, not
+  // drought. Mumbai City/Suburban and the Mithi River catchment carry the
+  // real documented waterlogging history (2005, 2017, 2019, 2021); MH's
+  // own table intentionally scores these districts low since it represents
+  // the drought-stressed agricultural belt, not this flood scenario.
+  MB: {
+    MUMBAI: 90,
+    'MUMBAI SUBURBAN': 92,
+    THANE: 72,
+    PALGHAR: 55,
+    RAIGARH: 62,
+    RATNAGIRI: 40,
+    PUNE: 35,
+    NASHIK: 22,
+    KOLHAPUR: 20,
+  },
 }
 
-export function getDistrictRisk(stateKey: 'HP' | 'KL' | 'MH' | 'UK', rawDistrictName: string) {
+export function getDistrictRisk(stateKey: 'HP' | 'KL' | 'MH' | 'UK' | 'MB', rawDistrictName: string) {
   const name = cleanDistrictName(rawDistrictName).toUpperCase().trim()
   return RISK[stateKey]?.[name] ?? 20
 }

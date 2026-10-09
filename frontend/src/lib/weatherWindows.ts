@@ -17,4 +17,5 @@ export const WEATHER_WINDOWS: Record<Region, WeatherWindow> = {
   KL: { lat: 10.85, lng: 76.27, start: '20180801', end: '20180820', label: '2018 flood window (documented)' },
   MH: { lat: 19.0, lng: 76.5, start: '20230401', end: '20230415', label: 'Representative pre-monsoon window (illustrative, not event-specific)' },
   UK: { lat: 30.55, lng: 79.56, start: '20230701', end: '20230710', label: 'Representative 2023 monsoon window (illustrative, not tied to a documented local event)' },
+  MB: { lat: 19.076, lng: 72.8777, start: '20050725', end: '20050727', label: '26 July 2005 Mumbai deluge window (documented)' },
 }

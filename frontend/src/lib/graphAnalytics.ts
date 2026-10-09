@@ -140,11 +140,12 @@ export function getNode(id: string) {
   return nodeById.get(id)
 }
 
-export const REGION_HAZARD: Record<'HP' | 'KL' | 'MH' | 'UK', string> = {
+export const REGION_HAZARD: Record<'HP' | 'KL' | 'MH' | 'UK' | 'MB', string> = {
   HP: 'hz-hp',
   KL: 'hz-kl',
   MH: 'hz-mh',
   UK: 'hz-uk',
+  MB: 'hz-mb',
 }
 
 /** Ordered hop-by-hop propagation stages for the causal replay timeline —
