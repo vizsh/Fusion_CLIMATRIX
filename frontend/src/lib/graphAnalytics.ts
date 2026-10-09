@@ -140,10 +140,51 @@ export function getNode(id: string) {
   return nodeById.get(id)
 }
 
-export const REGION_HAZARD: Record<'HP' | 'KL' | 'MH', string> = {
+export const REGION_HAZARD: Record<'HP' | 'KL' | 'MH' | 'UK', string> = {
   HP: 'hz-hp',
   KL: 'hz-kl',
   MH: 'hz-mh',
+  UK: 'hz-uk',
+}
+
+/** Ordered hop-by-hop propagation stages for the causal replay timeline —
+ * derived from the actual graph (BFS by hop), not a hardcoded disaster
+ * script, so it reflects whatever this scenario's dependency chain is. */
+export interface ReplayStage {
+  hop: number
+  label: string
+  nodes: GNode[]
+}
+
+export function graphStages(hazardId: string, maxHops = 4): ReplayStage[] {
+  const start = getNode(hazardId)
+  if (!start) return []
+  const visited = new Set<string>([hazardId])
+  let frontier = [hazardId]
+  const stages: ReplayStage[] = [{ hop: 0, label: 'Hazard conditions intensify', nodes: [start] }]
+  const HOP_LABELS = [
+    '',
+    'Directly exposed infrastructure',
+    'Dependent suppliers and access routes',
+    'Affected companies and borrowers',
+    'Financial institutions exposed',
+  ]
+  for (let hop = 1; hop <= maxHops; hop++) {
+    const next: string[] = []
+    for (const id of frontier) {
+      for (const e of forward.get(id) ?? []) {
+        if (!visited.has(e.to)) {
+          visited.add(e.to)
+          next.push(e.to)
+        }
+      }
+    }
+    if (!next.length) break
+    const nodes = next.map((id) => getNode(id)).filter((n): n is GNode => !!n)
+    stages.push({ hop, label: HOP_LABELS[Math.min(hop, HOP_LABELS.length - 1)], nodes })
+    frontier = next
+  }
+  return stages
 }
 
 export interface PortfolioStats {

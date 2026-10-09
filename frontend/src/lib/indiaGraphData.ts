@@ -26,7 +26,7 @@ export interface GNode {
   id: string
   label: string
   kind: NodeKind
-  region?: 'HP' | 'KL' | 'MH' | 'National'
+  region?: 'HP' | 'KL' | 'MH' | 'UK' | 'National'
   sector?: string
   note?: string
   coords?: [number, number] // [lng, lat]
@@ -34,6 +34,10 @@ export interface GNode {
   eadCr?: number
   baselinePd?: number
   baselineLgd?: number
+  /** Illustrative annual revenue (₹ cr), for the equity/investor lens only.
+   * Set explicitly on the flagship company; elsewhere derived from EAD via
+   * a disclosed assumption (see sectorVulnerability.ts estimateRevenue). */
+  annualRevenueCr?: number
 }
 
 export interface GEdge {
@@ -146,6 +150,32 @@ export const NODES: GNode[] = [
   { id: 'govt-1', label: 'National Infrastructure Resilience Fund', kind: 'govt', region: 'National', sector: 'Public finance', coords: [77.21, 28.61] },
   { id: 'govt-2', label: 'State Disaster Recovery Fund — HP', kind: 'govt', region: 'HP', sector: 'Public finance', coords: [77.17, 31.1] },
   { id: 'insurer-1', label: 'Bharat General Insurance Co.', kind: 'insurer', region: 'National', sector: 'Insurance', coords: [72.83, 19.02] },
+
+  // ---- Flagship: Uttarakhand construction company (bank + investor scenario) ----
+  {
+    id: 'hz-uk',
+    label: 'Chamoli–Joshimath Corridor — Landslide Susceptibility',
+    kind: 'hazard',
+    region: 'UK',
+    coords: [79.56, 30.55],
+    note: 'Illustrative susceptibility zone for this demonstration — not an engineering-grade landslide hazard map or a prediction that a landslide will occur.',
+  },
+  { id: 'infra-uk-road', label: 'Rishikesh–Badrinath Access Road (NH-58)', kind: 'infra', region: 'UK', sector: 'Road', coords: [79.49, 30.42] },
+  { id: 'infra-uk-bridge', label: 'Alaknanda River Crossing', kind: 'infra', region: 'UK', sector: 'Bridge', coords: [79.57, 30.52] },
+  { id: 'sup-uk-cement', label: 'Uttarakhand Cement & Steel Depot', kind: 'supplier', region: 'UK', sector: 'Construction inputs', coords: [79.32, 30.08] },
+  {
+    id: 'co-uk-construction',
+    label: 'Himalaya Infra Builders Pvt. Ltd.',
+    kind: 'company',
+    region: 'UK',
+    sector: 'Construction',
+    coords: [79.58, 30.57],
+    eadCr: 100,
+    baselinePd: 0.022,
+    baselineLgd: 0.4,
+    annualRevenueCr: 260,
+    note: 'Fictional construction/infrastructure company under consideration for a new ₹100 cr credit facility — the FIN-04 flagship bank-and-investor demonstration.',
+  },
 ]
 
 // Evidence mapping follows the type of relationship, not a per-edge guess:
@@ -244,6 +274,15 @@ export const EDGES: GEdge[] = [
   { id: 'i-kltourism', from: 'co-kl-tourism', to: 'insurer-1', type: 'INSURED_BY', evidence: 'synthetic', weight: 1 },
   { id: 'i-klagri', from: 'co-kl-agri', to: 'insurer-1', type: 'INSURED_BY', evidence: 'synthetic', weight: 1 },
   { id: 'i-mhagri', from: 'co-mh-agri', to: 'insurer-1', type: 'INSURED_BY', evidence: 'synthetic', weight: 1 },
+
+  // Uttarakhand flagship: hazard -> road/bridge -> supplier/company -> bank
+  { id: 'e-hz-uk-road', from: 'hz-uk', to: 'infra-uk-road', type: 'AFFECTED_BY', evidence: 'assumption', weight: 3 },
+  { id: 'e-hz-uk-bridge', from: 'hz-uk', to: 'infra-uk-bridge', type: 'AFFECTED_BY', evidence: 'assumption', weight: 2 },
+  { id: 'e-ukroad-cement', from: 'infra-uk-road', to: 'sup-uk-cement', type: 'DEPENDS_ON', evidence: 'modelled', weight: 2 },
+  { id: 'e-ukroad-construction', from: 'infra-uk-road', to: 'co-uk-construction', type: 'DEPENDS_ON', evidence: 'modelled', weight: 3 },
+  { id: 'e-ukbridge-construction', from: 'infra-uk-bridge', to: 'co-uk-construction', type: 'DEPENDS_ON', evidence: 'modelled', weight: 2 },
+  { id: 's-ukcement-construction', from: 'sup-uk-cement', to: 'co-uk-construction', type: 'SUPPLIES', evidence: 'synthetic', weight: 3 },
+  { id: 'f-ukconstruction-bank1', from: 'co-uk-construction', to: 'bank-1', type: 'FINANCED_BY', evidence: 'synthetic', weight: 3 },
 ]
 
 export const KIND_META: Record<NodeKind, { color: string; label: string }> = {

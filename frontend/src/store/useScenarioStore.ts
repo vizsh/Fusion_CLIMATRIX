@@ -2,23 +2,37 @@ import { useEffect, useRef } from 'react'
 import { create } from 'zustand'
 import { computeHazardReach, REGION_HAZARD } from '../lib/graphAnalytics'
 import { combinedReductionShare, totalInterventionCost } from '../lib/interventions'
-import { sectorVulnerability } from '../lib/sectorVulnerability'
+import { estimateRevenue, sectorVulnerability } from '../lib/sectorVulnerability'
 
-export type Hazard = 'Flood' | 'Drought' | 'Cyclone' | 'Heatwave'
+export type Hazard = 'Flood' | 'Drought' | 'Cyclone' | 'Heatwave' | 'Landslide'
 export type Substitutability = 'Limited' | 'Moderate' | 'Strong'
-export type Region = 'HP' | 'KL' | 'MH'
+export type Region = 'HP' | 'KL' | 'MH' | 'UK'
 export type RunState = 'idle' | 'running' | 'paused' | 'done'
+export type UserMode = 'bank' | 'investor'
+export type ScenarioProfile = 'Baseline' | 'Moderate' | 'Severe' | 'Compound'
 
 export const REGION_LABEL: Record<Region, string> = {
   HP: 'Himachal Pradesh',
   KL: 'Kerala',
   MH: 'Agricultural Belt (Drought)',
+  UK: 'Uttarakhand (Construction)',
 }
 
 export const REGION_DEFAULT_HAZARD: Record<Region, Hazard> = {
   HP: 'Flood',
   KL: 'Flood',
   MH: 'Drought',
+  UK: 'Landslide',
+}
+
+// "Ordinary conditions" through to catastrophic — severity/duration presets
+// so the product isn't only about extreme disasters. These are illustrative
+// stress-dial combinations, not calibrated return periods or probabilities.
+export const SCENARIO_PROFILES: Record<ScenarioProfile, { severity: number; durationMonths: number; desc: string }> = {
+  Baseline: { severity: 15, durationMonths: 1, desc: 'Ordinary seasonal conditions — minimal disruption.' },
+  Moderate: { severity: 45, durationMonths: 3, desc: 'Moderate adverse conditions — repeated minor disruption.' },
+  Severe: { severity: 80, durationMonths: 6, desc: 'Severe but plausible — the flagship stress scenario.' },
+  Compound: { severity: 100, durationMonths: 12, desc: 'Compound/prolonged — extreme and sustained.' },
 }
 
 interface SavedScenario {
@@ -33,6 +47,10 @@ interface SavedScenario {
 }
 
 interface ScenarioState {
+  // --- which financial lens every view renders — forks the analysis, not the data ---
+  userMode: UserMode
+  setUserMode: (m: UserMode) => void
+
   // --- scenario configuration (shared across every module) ---
   region: Region
   hazard: Hazard
@@ -40,6 +58,7 @@ interface ScenarioState {
   durationMonths: number
   substitutability: Substitutability
   interventions: string[]
+  applyProfile: (p: ScenarioProfile) => void
 
   // --- run / timeline state ---
   runState: RunState
@@ -102,6 +121,9 @@ function persistSaved(list: SavedScenario[]) {
 }
 
 export const useScenarioStore = create<ScenarioState>((set, get) => ({
+  userMode: 'bank',
+  setUserMode: (userMode) => set({ userMode }),
+
   region: 'HP',
   hazard: 'Flood',
   severity: 90,
@@ -125,6 +147,10 @@ export const useScenarioStore = create<ScenarioState>((set, get) => ({
   setSeverity: (severity) => set({ severity, runState: 'idle', timelineMonth: 0 }),
   setDuration: (durationMonths) => set({ durationMonths, runState: 'idle', timelineMonth: 0 }),
   setSubstitutability: (substitutability) => set({ substitutability, runState: 'idle', timelineMonth: 0 }),
+  applyProfile: (profile) => {
+    const p = SCENARIO_PROFILES[profile]
+    set({ severity: p.severity, durationMonths: p.durationMonths, runState: 'idle', timelineMonth: 0 })
+  },
 
   toggleIntervention: (id) =>
     set((s) => ({
@@ -377,5 +403,48 @@ export function computeImpact(state: {
     avoidedEl,
     interventionCostCr,
     bySector: Array.from(bySectorMap.values()).sort((a, b) => b.stressedEl - a.stressedEl),
+  }
+}
+
+export interface EquityImpactResult {
+  annualRevenueCr: number
+  exposedRevenueShare: number
+  disruptionFraction: number
+  revenueAtRiskCr: number
+  marginImpactCr: number
+  cashflowImpactCr: number
+}
+
+// Disclosed placeholder assumptions for the equity/investor lens — a
+// screening approximation (per Revenue at risk = annual revenue x exposed
+// share x disruption fraction x months/12), NOT a calibrated earnings
+// model, DCF input, or valuation adjustment.
+const ASSUMED_EXPOSED_REVENUE_SHARE = 0.55
+const ASSUMED_OPERATING_MARGIN = 0.16
+
+/** The equity/investor financial lens — deliberately separate from the
+ * bank's credit-risk calculation above. Operates on a single company, not
+ * a portfolio, since investment research is bottom-up by construction. */
+export function computeEquityImpact(
+  company: { sector?: string; eadCr?: number; annualRevenueCr?: number },
+  severity: number,
+  durationMonths: number,
+): EquityImpactResult {
+  const annualRevenueCr = estimateRevenue(company.eadCr, company.annualRevenueCr)
+  const vulnerability = sectorVulnerability(company.sector)
+  const disruptionFraction = Math.min((severity / 100) * vulnerability, 1)
+  const monthsFraction = Math.min(durationMonths / 12, 1)
+
+  const revenueAtRiskCr = annualRevenueCr * ASSUMED_EXPOSED_REVENUE_SHARE * disruptionFraction * monthsFraction
+  const marginImpactCr = revenueAtRiskCr * ASSUMED_OPERATING_MARGIN
+  const cashflowImpactCr = marginImpactCr
+
+  return {
+    annualRevenueCr,
+    exposedRevenueShare: ASSUMED_EXPOSED_REVENUE_SHARE,
+    disruptionFraction,
+    revenueAtRiskCr,
+    marginImpactCr,
+    cashflowImpactCr,
   }
 }

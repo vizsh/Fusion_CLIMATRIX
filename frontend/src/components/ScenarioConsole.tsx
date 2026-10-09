@@ -1,15 +1,18 @@
 import { Pause, Play, RotateCcw, RotateCw } from 'lucide-react'
 import {
   REGION_LABEL,
+  SCENARIO_PROFILES,
   useScenarioStore,
   type Hazard,
   type Region,
+  type ScenarioProfile,
   type Substitutability,
 } from '../store/useScenarioStore'
 
-const REGIONS: Region[] = ['HP', 'KL', 'MH']
-const HAZARDS: Hazard[] = ['Flood', 'Drought', 'Cyclone', 'Heatwave']
+const REGIONS: Region[] = ['HP', 'KL', 'MH', 'UK']
+const HAZARDS: Hazard[] = ['Flood', 'Drought', 'Cyclone', 'Heatwave', 'Landslide']
 const SUBS: Substitutability[] = ['Limited', 'Moderate', 'Strong']
+const PROFILES: ScenarioProfile[] = ['Baseline', 'Moderate', 'Severe', 'Compound']
 
 function Seg<T extends string>({
   value,
@@ -60,10 +63,31 @@ export default function ScenarioConsole({ compact = false }: { compact?: boolean
     resume,
     replay,
     reset,
+    applyProfile,
   } = useScenarioStore()
 
   return (
     <div className={`flex flex-wrap items-end gap-4 ${compact ? '' : 'p-4'}`}>
+      <div>
+        <div className="mb-1 font-mono text-[9px] tracking-[0.15em] text-slate-500">CONDITIONS</div>
+        <div className="flex gap-1">
+          {PROFILES.map((p) => (
+            <button
+              key={p}
+              title={SCENARIO_PROFILES[p].desc}
+              onClick={() => applyProfile(p)}
+              className={`rounded border px-2 py-1 font-mono text-[10px] tracking-wide transition-colors ${
+                severity === SCENARIO_PROFILES[p].severity && durationMonths === SCENARIO_PROFILES[p].durationMonths
+                  ? 'border-risk-med/50 bg-risk-med/10 text-risk-med'
+                  : 'border-line text-slate-500 hover:border-slate-600 hover:text-slate-300'
+              }`}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div>
         <div className="mb-1 font-mono text-[9px] tracking-[0.15em] text-slate-500">REGION</div>
         <Seg value={region} options={REGIONS} onChange={setRegion} labels={REGION_LABEL as Record<Region, string>} />

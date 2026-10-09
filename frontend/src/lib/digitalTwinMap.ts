@@ -69,18 +69,46 @@ export interface CameraPreset {
   bearing: number
 }
 
-export const CAMERA_PRESETS: Record<'india' | 'HP' | 'KL' | 'MH' | 'valley', CameraPreset> = {
+export const CAMERA_PRESETS: Record<'india' | 'HP' | 'KL' | 'MH' | 'UK' | 'valley', CameraPreset> = {
   india: { label: 'India', center: [79, 22.5], zoom: 4.2, pitch: 0, bearing: 0 },
   HP: { label: 'Himachal Pradesh', center: [77.05, 31.85], zoom: 7.6, pitch: 45, bearing: -12 },
   KL: { label: 'Kerala', center: [76.4, 10.3], zoom: 7.3, pitch: 40, bearing: 0 },
   MH: { label: 'Marathwada', center: [76.4, 18.9], zoom: 7.3, pitch: 35, bearing: 0 },
+  UK: { label: 'Chamoli–Joshimath Corridor', center: [79.55, 30.5], zoom: 9.6, pitch: 62, bearing: -20 },
   valley: { label: 'Kullu–Manali Valley', center: [77.16, 32.05], zoom: 10.6, pitch: 66, bearing: 18 },
 }
 
-export const GEO_FILE_BY_REGION: Record<Region, string> = {
+// No real district boundary file for UK yet — Digital Twin skips the
+// choropleth layer there and relies on markers plus the illustrative zone.
+export const GEO_FILE_BY_REGION: Partial<Record<Region, string>> = {
   HP: '/geo/himachal_pradesh.geojson',
   KL: '/geo/kerala.geojson',
   MH: '/geo/maharashtra.geojson',
+}
+
+// Illustrative landslide-susceptibility zone around the Chamoli-Joshimath
+// corridor — a hand-authored demonstration shape (no DEM-derived flood
+// ribbon here; the terrain is far steeper and the hazard mechanism is
+// different from the HP flood case), clearly NOT an engineering survey.
+export const UK_HAZARD_ZONE: GeoJSON.Feature<GeoJSON.Polygon> = {
+  type: 'Feature',
+  properties: {},
+  geometry: {
+    type: 'Polygon',
+    coordinates: [
+      [
+        [79.44, 30.38],
+        [79.52, 30.4],
+        [79.58, 30.48],
+        [79.6, 30.56],
+        [79.57, 30.6],
+        [79.5, 30.56],
+        [79.46, 30.48],
+        [79.42, 30.42],
+        [79.44, 30.38],
+      ],
+    ],
+  },
 }
 
 // Illustrative flood extent tracing the Beas river corridor between Kullu

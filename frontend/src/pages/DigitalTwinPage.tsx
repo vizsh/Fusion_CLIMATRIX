@@ -28,11 +28,14 @@ import {
   institutionalStyle,
   SKY_PAINT,
   terrainSatelliteStyle,
+  UK_HAZARD_ZONE,
 } from '../lib/digitalTwinMap'
 import { cleanDistrictName, getDistrictRisk } from '../lib/districtRisk'
 import { computeFloodRibbon, loadElevationSampler, type ElevationSampler } from '../lib/floodModel'
+import { graphStages, REGION_HAZARD } from '../lib/graphAnalytics'
 import { KIND_META, NODES, type NodeKind } from '../lib/indiaGraphData'
-import { useScenarioStore } from '../store/useScenarioStore'
+import { useScenarioStore, type Region } from '../store/useScenarioStore'
+import { Film } from 'lucide-react'
 
 const KIND_ICON: Record<NodeKind, typeof AlertTriangle> = {
   hazard: AlertTriangle,
@@ -135,8 +138,13 @@ export default function DigitalTwinPage() {
   // reloads that region's real district boundaries.
   useEffect(() => {
     flyTo(CAMERA_PRESETS[region], 'region')
+    const geoFile = GEO_FILE_BY_REGION[region]
+    if (!geoFile) {
+      setDistrictData(null)
+      return
+    }
     let cancelled = false
-    fetch(GEO_FILE_BY_REGION[region])
+    fetch(geoFile)
       .then((r) => r.json())
       .then((raw: FeatureCollection) => {
         if (cancelled) return
@@ -188,7 +196,7 @@ export default function DigitalTwinPage() {
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
         title="DIGITAL TWIN"
-        subtitle="HIMALAYAN TERRAIN · REAL ELEVATION · FLAGSHIP HIMACHAL PRADESH SCENARIO"
+        subtitle="HIMALAYAN TERRAIN · REAL ELEVATION · SELECT A REGION BELOW"
         tag="CLICK ANY ASSET TO TRACE ITS DEPENDENCY CHAIN"
       />
 
@@ -246,6 +254,21 @@ export default function DigitalTwinPage() {
                   'line-width': simulated ? 3.5 : 2,
                   'line-dasharray': simulated ? [1, 1.4] : [1, 0],
                 }}
+              />
+            </Source>
+          )}
+
+          {region === 'UK' && (
+            <Source type="geojson" data={UK_HAZARD_ZONE}>
+              <Layer
+                id="uk-hazard-zone"
+                type="fill"
+                paint={{ 'fill-color': '#f5a524', 'fill-opacity': simulated ? 0.22 : 0.08 }}
+              />
+              <Layer
+                id="uk-hazard-zone-outline"
+                type="line"
+                paint={{ 'line-color': '#f5a524', 'line-width': simulated ? 1.6 : 0.6, 'line-opacity': simulated ? 0.85 : 0.35 }}
               />
             </Source>
           )}
@@ -396,8 +419,9 @@ export default function DigitalTwinPage() {
         </div>
 
         <AnimatePresence>
-          {selectedEntityId && (
+          {selectedEntityId ? (
             <motion.div
+              key="inspector"
               initial={{ x: 340, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: 340, opacity: 0 }}
@@ -406,12 +430,70 @@ export default function DigitalTwinPage() {
             >
               <EntityInspector nodeId={selectedEntityId} onClose={() => setSelectedEntity(null)} onSelect={setSelectedEntity} />
             </motion.div>
+          ) : (
+            simulated && (
+              <motion.div
+                key="replay"
+                initial={{ x: 340, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={{ x: 340, opacity: 0 }}
+                transition={{ duration: 0.25, ease: 'easeOut' }}
+                className="absolute right-0 top-0 h-full w-[340px] overflow-y-auto border-l border-line bg-panel/95 p-4 backdrop-blur"
+              >
+                <CausalReplayPanel region={region} onSelect={setSelectedEntity} />
+              </motion.div>
+            )
           )}
         </AnimatePresence>
       </div>
 
       <div className="shrink-0 border-t border-line bg-panel/90">
         <ScenarioConsole compact />
+      </div>
+    </div>
+  )
+}
+
+/** Causal replay — the propagation sequence derived live from the actual
+ * dependency graph (BFS by hop from the active hazard), not a hardcoded
+ * disaster script. Clicking a stage selects its first asset. */
+function CausalReplayPanel({ region, onSelect }: { region: Region; onSelect: (id: string) => void }) {
+  const hazardId = REGION_HAZARD[region]
+  const stages = useMemo(() => graphStages(hazardId), [hazardId])
+
+  return (
+    <div>
+      <div className="mb-3 flex items-center gap-2 text-cyan">
+        <Film size={14} />
+        <span className="font-mono text-[11px] tracking-wide">CAUSAL REPLAY</span>
+      </div>
+      <p className="mb-3 text-[10.5px] leading-relaxed text-slate-500">
+        The propagation sequence for this scenario, derived from the dependency graph — click a
+        stage to inspect it.
+      </p>
+      <div className="space-y-3">
+        {stages.map((stage) => (
+          <div key={stage.hop} className="border-l-2 border-cyan/30 pl-3">
+            <div className="font-mono text-[9px] tracking-wide text-slate-500">
+              STAGE {stage.hop} · {stage.label.toUpperCase()}
+            </div>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {stage.nodes.map((n) => {
+                const meta = KIND_META[n.kind]
+                return (
+                  <button
+                    key={n.id}
+                    onClick={() => onSelect(n.id)}
+                    className="rounded border px-2 py-1 text-left text-[10.5px] transition-colors hover:brightness-125"
+                    style={{ borderColor: `${meta.color}55`, color: meta.color, background: `${meta.color}0f` }}
+                  >
+                    {n.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )

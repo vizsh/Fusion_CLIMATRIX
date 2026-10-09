@@ -2,8 +2,10 @@ import {
   Building2,
   FileCheck2,
   Globe2,
+  Landmark,
   LayoutGrid,
   Leaf,
+  LineChart,
   Network,
   PieChart,
   Play,
@@ -45,6 +47,8 @@ export default function AppShell() {
   const runState = useScenarioStore((s) => s.runState)
   const startPresentation = useScenarioStore((s) => s.startPresentation)
   const presentationActive = useScenarioStore((s) => s.presentationActive)
+  const userMode = useScenarioStore((s) => s.userMode)
+  const setUserMode = useScenarioStore((s) => s.setUserMode)
 
   return (
     <div className="flex h-screen w-screen flex-col bg-base">
@@ -63,6 +67,24 @@ export default function AppShell() {
         </div>
 
         <div className="flex items-center gap-4">
+          <div className="flex items-center rounded border border-line bg-panel-2 p-0.5">
+            <button
+              onClick={() => setUserMode('bank')}
+              className={`flex items-center gap-1.5 rounded px-2.5 py-1 font-mono text-[10px] tracking-wide transition-colors ${
+                userMode === 'bank' ? 'bg-cyan/15 text-cyan' : 'text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              <Landmark size={11} /> BANK
+            </button>
+            <button
+              onClick={() => setUserMode('investor')}
+              className={`flex items-center gap-1.5 rounded px-2.5 py-1 font-mono text-[10px] tracking-wide transition-colors ${
+                userMode === 'investor' ? 'bg-cyan/15 text-cyan' : 'text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              <LineChart size={11} /> INVESTOR
+            </button>
+          </div>
           <div className={`font-mono text-[10px] tracking-[0.1em] ${RUN_COLOR[runState]}`}>
             {RUN_LABEL[runState]}
           </div>

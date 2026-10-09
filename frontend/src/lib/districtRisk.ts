@@ -87,7 +87,7 @@ const RISK: Record<string, Record<string, number>> = {
   },
 }
 
-export function getDistrictRisk(stateKey: 'HP' | 'KL' | 'MH', rawDistrictName: string) {
+export function getDistrictRisk(stateKey: 'HP' | 'KL' | 'MH' | 'UK', rawDistrictName: string) {
   const name = cleanDistrictName(rawDistrictName).toUpperCase().trim()
   return RISK[stateKey]?.[name] ?? 20
 }
