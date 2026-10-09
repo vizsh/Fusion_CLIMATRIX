@@ -9,7 +9,7 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 
-import { AlertTriangle, Flame, Network, Search, ShieldAlert, SlidersHorizontal } from 'lucide-react'
+import { AlertTriangle, Flame, Network, Search, ShieldAlert, SlidersHorizontal, Zap } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import EntityInspector from '../components/graph/EntityInspector'
 import PageHeader from '../components/PageHeader'
@@ -20,11 +20,14 @@ import {
   computeBankConcentration,
   computeBottlenecks,
   getConnectedChain,
+  getDescendants,
+  REGION_HAZARD,
   totalPortfolioEAD,
 } from '../lib/graphAnalytics'
+import { computeProtectionGap } from '../lib/insurance'
 import { EDGES, KIND_META, NODES, type GNode } from '../lib/indiaGraphData'
 import GraphNode from '../components/graph/GraphNode'
-import { type Region, useScenarioStore } from '../store/useScenarioStore'
+import { computeImpact, REGION_LABEL, type Region, useScenarioStore } from '../store/useScenarioStore'
 
 const NODE_TYPES = { ind: GraphNode }
 const BASE_LAYOUT = layoutGraph(NODES, EDGES)
@@ -37,11 +40,29 @@ export default function DependencyExplorerPage() {
   const selectedId = useScenarioStore((s) => s.selectedEntityId)
   const setSelectedId = useScenarioStore((s) => s.setSelectedEntity)
   const setRegion = useScenarioStore((s) => s.setRegion)
-  const activeRegion = useScenarioStore((s) => s.region)
+  const scenario = useScenarioStore()
+  const activeRegion = scenario.region
   const [query, setQuery] = useState('')
   const [showConsole, setShowConsole] = useState(true)
 
   const chain = useMemo(() => (selectedId ? getConnectedChain(selectedId) : null), [selectedId])
+
+  // What the ACTIVE SCENARIO reaches, independent of any click/search — this
+  // is what makes changing region/hazard/severity visibly change the graph
+  // even before the user selects anything, which is the whole point of a
+  // scenario console: "what does this change affect" should be answerable
+  // immediately, not only after drilling into one node.
+  const hazardId = REGION_HAZARD[activeRegion]
+  const scenarioReach = useMemo(() => getDescendants(hazardId), [hazardId])
+  const impact = useMemo(
+    () => computeImpact(scenario),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [scenario.region, scenario.severity, scenario.durationMonths, scenario.substitutability, scenario.interventions],
+  )
+  const protectionGap = useMemo(
+    () => computeProtectionGap(hazardId, scenario.severity, scenario.durationMonths),
+    [hazardId, scenario.severity, scenario.durationMonths],
+  )
 
   const matchedIds = useMemo(() => {
     if (!query.trim()) return null
@@ -51,35 +72,34 @@ export default function DependencyExplorerPage() {
 
   const nodes: Node[] = useMemo(() => {
     return BASE_LAYOUT.nodes.map((n) => {
-      const inChain = chain ? chain.nodes.has(n.id) : true
+      const inChain = chain ? chain.nodes.has(n.id) : scenarioReach.nodes.has(n.id)
       const inMatch = matchedIds ? matchedIds.has(n.id) : true
       return {
         ...n,
-        data: { ...n.data, dimmed: !inChain || !inMatch, active: chain ? inChain : false, selected: n.id === selectedId },
+        data: { ...n.data, dimmed: !inChain || !inMatch, active: inChain, selected: n.id === selectedId },
       }
     })
-  }, [chain, matchedIds, selectedId])
+  }, [chain, scenarioReach, matchedIds, selectedId])
 
   const edges: Edge[] = useMemo(() => {
     return EDGES.map((e) => {
       const meta = EVIDENCE_META[e.evidence]
-      const inChain = chain ? chain.edges.has(e.id) : true
-      const highlighted = chain ? inChain : false
+      const inChain = chain ? chain.edges.has(e.id) : scenarioReach.edges.has(e.id)
       return {
         id: e.id,
         source: e.from,
         target: e.to,
         type: 'smoothstep',
-        animated: highlighted,
+        animated: inChain,
         style: {
-          stroke: highlighted ? meta.color : '#1c2430',
-          strokeWidth: highlighted ? Math.max(1.4, e.weight * 0.9) : 1,
+          stroke: inChain ? meta.color : '#1c2430',
+          strokeWidth: inChain ? Math.max(1.4, e.weight * 0.9) : 1,
           strokeDasharray: meta.dash,
-          opacity: chain ? (inChain ? 0.9 : 0.08) : 0.35,
+          opacity: inChain ? 0.9 : 0.08,
         },
       }
     })
-  }, [chain])
+  }, [chain, scenarioReach])
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -237,11 +257,55 @@ export default function DependencyExplorerPage() {
               <EntityInspector nodeId={selectedId} onClose={() => setSelectedId(null)} onSelect={setSelectedId} />
             </div>
           ) : (
-            <div className="border-b border-line p-4 text-[11px] leading-relaxed text-slate-500">
-              <Network size={14} className="mb-2 text-cyan" />
-              Build a scenario above, then search or click any node — e.g. set region to Himachal
-              Pradesh and search "Union Pradesh Bank" to see exactly which of its borrowers that
-              scenario would hit, and by how much.
+            <div className="border-b border-line p-4">
+              <div className="mb-2 flex items-center gap-1.5 font-mono text-[10px] tracking-[0.15em] text-slate-500">
+                <Zap size={12} className="text-cyan" /> SCENARIO IMPACT — LIVE
+              </div>
+              <p className="mb-3 text-[10.5px] leading-relaxed text-slate-500">
+                {REGION_LABEL[scenario.region]} · {scenario.hazard}, severity {scenario.severity}/100. The
+                highlighted nodes on the graph are exactly what this scenario reaches — change any dial above and
+                both the graph and the numbers below update immediately.
+              </p>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between rounded border border-line bg-panel-2 px-2.5 py-2 text-[11px]">
+                  <span className="text-slate-500">Companies reached</span>
+                  <span className="font-mono-tnum text-slate-200">{impact.companyCount}</span>
+                </div>
+                <div className="flex items-center justify-between rounded border border-line bg-panel-2 px-2.5 py-2 text-[11px]">
+                  <span className="text-slate-500">EAD at risk</span>
+                  <span className="font-mono-tnum text-slate-200">₹{impact.eadCr.toFixed(0)} cr</span>
+                </div>
+                <div className="flex items-center justify-between rounded border border-line bg-panel-2 px-2.5 py-2 text-[11px]">
+                  <span className="text-slate-500">Baseline → stressed EL</span>
+                  <span className="font-mono-tnum text-risk-high">
+                    ₹{impact.baselineEl.toFixed(1)} cr → ₹{impact.stressedEl.toFixed(1)} cr
+                  </span>
+                </div>
+                <div className="flex items-center justify-between rounded border border-line bg-panel-2 px-2.5 py-2 text-[11px]">
+                  <span className="text-slate-500">Protection gap (uninsured)</span>
+                  <span className="font-mono-tnum text-risk-med">{(protectionGap.protectionGapShare * 100).toFixed(0)}%</span>
+                </div>
+              </div>
+              {impact.bySector.length > 0 && (
+                <>
+                  <div className="mb-1.5 mt-3 font-mono text-[9px] tracking-[0.15em] text-slate-500">
+                    WHICH SEGMENTS, AND WHY
+                  </div>
+                  <div className="space-y-1.5">
+                    {impact.bySector.map((s) => (
+                      <div key={s.sector} className="flex items-center justify-between text-[10.5px]">
+                        <span className="text-slate-400">{s.sector}</span>
+                        <span className="font-mono-tnum text-slate-300">₹{s.stressedEl.toFixed(1)} cr</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+              <p className="mt-3 text-[9.5px] leading-relaxed text-slate-600">
+                <Network size={11} className="mb-0.5 mr-1 inline text-cyan" />
+                Click or search any highlighted node for its own scenario-adjusted detail, or see Insurance &amp;
+                Protection Gap for which of these borrowers are uninsured.
+              </p>
             </div>
           )}
 

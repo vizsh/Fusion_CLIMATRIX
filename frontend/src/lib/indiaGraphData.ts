@@ -38,6 +38,19 @@ export interface GNode {
    * Set explicitly on the flagship company; elsewhere derived from EAD via
    * a disclosed assumption (see sectorVulnerability.ts estimateRevenue). */
   annualRevenueCr?: number
+  // Insurance economics — only meaningful on the subset of companies that
+  // carry a policy (via an INSURED_BY edge) and on insurer nodes. Disclosed
+  // illustrative figures, not real policy data — see lib/insurance.ts.
+  /** Property/business-interruption sum insured (₹ cr), company-level. */
+  sumInsuredCr?: number
+  /** Annualized premium rate, basis points of sum insured. */
+  premiumRateBps?: number
+  /** Policyholder-retained share of a claim before the insurer pays (0-1). */
+  deductiblePct?: number
+  /** Insurer-level: share of its own net claims ceded to a reinsurance treaty (0-100). */
+  cededReinsuranceSharePct?: number
+  /** Insurer-level: name of the treaty/reinsurer claims are ceded to — disclosed as a field, not a separately graphed entity. */
+  reinsurerName?: string
 }
 
 export interface GEdge {
@@ -124,16 +137,16 @@ export const NODES: GNode[] = [
   // ---- Companies / borrowers -----------------------------------------------
   { id: 'co-hp-auto', label: 'Himalayan Auto Components Ltd.', kind: 'company', region: 'HP', sector: 'Manufacturing', coords: [76.8, 30.95], eadCr: 210, baselinePd: 0.018, baselineLgd: 0.32 },
   { id: 'co-hp-pharma', label: 'Baddi Pharmaceuticals Pvt. Ltd.', kind: 'company', region: 'HP', sector: 'Pharmaceuticals', coords: [76.78, 30.94], eadCr: 340, baselinePd: 0.012, baselineLgd: 0.28 },
-  { id: 'co-hp-tourism', label: 'Manali Hill Tourism Cooperative', kind: 'company', region: 'HP', sector: 'Tourism', coords: [77.19, 32.25], eadCr: 95, baselinePd: 0.03, baselineLgd: 0.4 },
+  { id: 'co-hp-tourism', label: 'Manali Hill Tourism Cooperative', kind: 'company', region: 'HP', sector: 'Tourism', coords: [77.19, 32.25], eadCr: 95, baselinePd: 0.03, baselineLgd: 0.4, sumInsuredCr: 70, premiumRateBps: 180, deductiblePct: 0.1 },
   { id: 'co-hp-agri', label: 'Kullu Apple Growers Federation', kind: 'company', region: 'HP', sector: 'Agriculture', coords: [77.1, 31.98], eadCr: 65, baselinePd: 0.028, baselineLgd: 0.38 },
 
-  { id: 'co-kl-tourism', label: 'Alleppey Backwater Resorts Ltd.', kind: 'company', region: 'KL', sector: 'Tourism', coords: [76.35, 9.49], eadCr: 120, baselinePd: 0.027, baselineLgd: 0.37 },
-  { id: 'co-kl-agri', label: 'Wayanad Plantation Exports Ltd.', kind: 'company', region: 'KL', sector: 'Agriculture', coords: [76.13, 11.6], eadCr: 150, baselinePd: 0.022, baselineLgd: 0.35 },
+  { id: 'co-kl-tourism', label: 'Alleppey Backwater Resorts Ltd.', kind: 'company', region: 'KL', sector: 'Tourism', coords: [76.35, 9.49], eadCr: 120, baselinePd: 0.027, baselineLgd: 0.37, sumInsuredCr: 90, premiumRateBps: 160, deductiblePct: 0.1 },
+  { id: 'co-kl-agri', label: 'Wayanad Plantation Exports Ltd.', kind: 'company', region: 'KL', sector: 'Agriculture', coords: [76.13, 11.6], eadCr: 150, baselinePd: 0.022, baselineLgd: 0.35, sumInsuredCr: 110, premiumRateBps: 220, deductiblePct: 0.15 },
   { id: 'co-kl-seafood', label: 'Kochi Marine Exports Pvt. Ltd.', kind: 'company', region: 'KL', sector: 'Seafood export', coords: [76.24, 9.95], eadCr: 180, baselinePd: 0.02, baselineLgd: 0.33 },
   { id: 'co-kl-rubber', label: 'Kottayam Rubber Processing Co.', kind: 'company', region: 'KL', sector: 'Rubber processing', coords: [76.52, 9.6], eadCr: 85, baselinePd: 0.024, baselineLgd: 0.34 },
 
   { id: 'co-mh-textile', label: 'Marathwada Textile Mills', kind: 'company', region: 'MH', sector: 'Textiles', coords: [76.5, 19.0], eadCr: 230, baselinePd: 0.025, baselineLgd: 0.36 },
-  { id: 'co-mh-agri', label: 'Marathwada Agro Processors Ltd.', kind: 'company', region: 'MH', sector: 'Agro processing', coords: [76.56, 18.41], eadCr: 140, baselinePd: 0.03, baselineLgd: 0.4 },
+  { id: 'co-mh-agri', label: 'Marathwada Agro Processors Ltd.', kind: 'company', region: 'MH', sector: 'Agro processing', coords: [76.56, 18.41], eadCr: 140, baselinePd: 0.03, baselineLgd: 0.4, sumInsuredCr: 95, premiumRateBps: 240, deductiblePct: 0.15 },
   { id: 'co-mh-cotton', label: 'Jalna Cotton & Yarn Mills', kind: 'company', region: 'MH', sector: 'Textiles', coords: [75.89, 19.85], eadCr: 110, baselinePd: 0.026, baselineLgd: 0.35 },
   { id: 'co-mh-dairy', label: 'Solapur Dairy Cooperative', kind: 'company', region: 'MH', sector: 'Dairy', coords: [75.91, 17.68], eadCr: 55, baselinePd: 0.032, baselineLgd: 0.42 },
 
@@ -149,7 +162,16 @@ export const NODES: GNode[] = [
   { id: 'nbfc-1', label: 'Deccan Rural Finance NBFC', kind: 'bank', region: 'MH', sector: 'NBFC / agri lender', coords: [73.86, 18.52] },
   { id: 'govt-1', label: 'National Infrastructure Resilience Fund', kind: 'govt', region: 'National', sector: 'Public finance', coords: [77.21, 28.61] },
   { id: 'govt-2', label: 'State Disaster Recovery Fund — HP', kind: 'govt', region: 'HP', sector: 'Public finance', coords: [77.17, 31.1] },
-  { id: 'insurer-1', label: 'Bharat General Insurance Co.', kind: 'insurer', region: 'National', sector: 'Insurance', coords: [72.83, 19.02] },
+  {
+    id: 'insurer-1',
+    label: 'Bharat General Insurance Co.',
+    kind: 'insurer',
+    region: 'National',
+    sector: 'Insurance',
+    coords: [72.83, 19.02],
+    cededReinsuranceSharePct: 40,
+    reinsurerName: 'Himalaya Re Catastrophe Treaty',
+  },
 
   // ---- Flagship: Uttarakhand construction company (bank + investor scenario) ----
   {

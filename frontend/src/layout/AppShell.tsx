@@ -10,6 +10,7 @@ import {
   PieChart,
   Play,
   Shield,
+  Umbrella,
   Workflow,
 } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
@@ -24,6 +25,7 @@ const NAV = [
   { to: '/company', label: 'Company Investigation', icon: Building2 },
   { to: '/portfolio', label: 'Portfolio Impact', icon: PieChart },
   { to: '/mitigation', label: 'Mitigation Studio', icon: Shield },
+  { to: '/insurance', label: 'Insurance & Protection Gap', icon: Umbrella },
   { to: '/evidence', label: 'Evidence & Reports', icon: FileCheck2 },
 ]
 

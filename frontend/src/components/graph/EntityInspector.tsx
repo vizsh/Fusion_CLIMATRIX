@@ -10,6 +10,7 @@ import {
   REGION_HAZARD,
 } from '../../lib/graphAnalytics'
 import { KIND_META, NODES, type GNode } from '../../lib/indiaGraphData'
+import { computeInsuranceAdjustedCredit, computeInsurerBook } from '../../lib/insurance'
 import { sectorVulnerability } from '../../lib/sectorVulnerability'
 import { computeEquityImpact, REGION_LABEL, stressPdLgd, useScenarioStore } from '../../store/useScenarioStore'
 
@@ -179,6 +180,9 @@ function CompanyStats({ node, onSelect }: { node: GNode; onSelect?: (id: string)
   const baselineEl = (node.eadCr ?? 0) * (node.baselinePd ?? 0) * (node.baselineLgd ?? 0)
   const stressedEl = (node.eadCr ?? 0) * stressedPd * stressedLgd
   const equity = computeEquityImpact(node, scenario.severity, scenario.durationMonths)
+  const insuranceAdjusted = inScenario
+    ? computeInsuranceAdjustedCredit(node, stressedPd, stressedLgd, scenario.severity, scenario.durationMonths)
+    : null
 
   const pathSentence = directInfraParent
     ? `Directly dependent on ${directInfra.map((i) => i.label).join(' and ')}.${
@@ -215,6 +219,20 @@ function CompanyStats({ node, onSelect }: { node: GNode; onSelect?: (id: string)
             value={inScenario ? `₹${stressedEl.toFixed(2)} cr` : `₹${baselineEl.toFixed(2)} cr (baseline)`}
             color={inScenario ? '#fb3a4a' : undefined}
           />
+          {inScenario && insuranceAdjusted && (
+            <div className="mt-2.5 rounded border border-cyan/30 bg-cyan/[0.06] p-2.5 text-[10.5px] leading-relaxed text-slate-400">
+              <span className="text-cyan">Insured by {insuranceAdjusted.insurer.label}.</span> Modeled claim
+              payout offsets ₹{insuranceAdjusted.insuranceOffsetCr.toFixed(2)} cr of loss-given-default — effective
+              stressed LGD drops to {(insuranceAdjusted.effectiveLgd * 100).toFixed(1)}%, insurance-adjusted EL ₹
+              {insuranceAdjusted.effectiveEl.toFixed(2)} cr.
+            </div>
+          )}
+          {inScenario && !insuranceAdjusted && (
+            <div className="mt-2.5 rounded border border-risk-high/30 bg-risk-high/[0.06] p-2.5 text-[10.5px] leading-relaxed text-risk-high">
+              No insurance coverage traced for this borrower — the full stressed loss above is uninsured. See
+              Insurance &amp; Protection Gap.
+            </div>
+          )}
         </>
       ) : (
         <>
@@ -268,6 +286,7 @@ function InstitutionStats({ node, onSelect }: { node: GNode; onSelect?: (id: str
   }
 
   const hasExposure = exposure.exposedBorrowers.length > 0
+  const book = node.kind === 'insurer' ? computeInsurerBook(node.id, activeHazardId, scenario.severity, scenario.durationMonths) : null
 
   return (
     <div>
@@ -287,6 +306,17 @@ function InstitutionStats({ node, onSelect }: { node: GNode; onSelect?: (id: str
 
       <StatRow label="Total book (all regions)" value={`₹${exposure.totalEAD.toFixed(0)} cr`} />
       <StatRow label="Scenario-exposed EAD" value={`₹${exposure.exposedEAD.toFixed(0)} cr`} color={hasExposure ? '#f5a524' : undefined} />
+      {book && book.policyCount > 0 && (
+        <>
+          <StatRow label="Underwriting — sum insured in scope" value={`₹${book.totalSumInsuredCr.toFixed(0)} cr`} />
+          <StatRow label="Expected net claims — scenario" value={`₹${book.expectedNetClaimsCr.toFixed(2)} cr`} color="#fb3a4a" />
+          <StatRow label="Gross loss ratio" value={`${(book.grossLossRatio * 100).toFixed(0)}%`} color="#f5a524" />
+          <StatRow
+            label={`Ceded to ${book.insurer.reinsurerName ?? 'reinsurer'}`}
+            value={`${book.cededSharePct}% · ₹${book.cededClaimsCr.toFixed(2)} cr`}
+          />
+        </>
+      )}
       {hasExposure && (
         <>
           <StatRow label="Baseline EL (exposed borrowers)" value={`₹${baselineEl.toFixed(2)} cr`} />

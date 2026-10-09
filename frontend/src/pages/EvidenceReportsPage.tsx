@@ -75,6 +75,11 @@ const EVIDENCE_ITEMS: EvidenceItem[] = [
     detail: 'Illustrative cost/benefit assumptions for each intervention lever — not validated engineering or financial estimates.',
   },
   {
+    label: 'Insurance protection gap, claim estimates, insurer loss ratios',
+    cls: 'assumption',
+    detail: 'Sum insured, premium rate and deductible are disclosed illustrative figures on a deliberately incomplete subset of companies (not every borrower carries a policy, by design — the gap itself is the finding). Claim estimates use the same severity-scaled disruption-fraction mechanic as the equity revenue-at-risk calculation, not a calibrated catastrophe or actuarial model. Insurance-adjusted LGD in Company Investigation and Dependency Explorer follows directly from this estimate.',
+  },
+  {
     label: 'Company names, sectors, EAD, baseline PD/LGD, bank/supplier relationships',
     cls: 'synthetic',
     detail: 'Entirely fabricated for this demonstration. No real Indian borrower, bank or supplier data is used anywhere in this prototype.',

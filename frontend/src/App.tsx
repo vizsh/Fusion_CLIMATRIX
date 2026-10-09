@@ -5,6 +5,7 @@ import CompanyInvestigationPage from './pages/CompanyInvestigationPage'
 import DependencyExplorerPage from './pages/DependencyExplorerPage'
 import DigitalTwinPage from './pages/DigitalTwinPage'
 import EvidenceReportsPage from './pages/EvidenceReportsPage'
+import InsurancePage from './pages/InsurancePage'
 import MitigationStudioPage from './pages/MitigationStudioPage'
 import PortfolioImpactPage from './pages/PortfolioImpactPage'
 import ScenarioLabPage from './pages/ScenarioLabPage'
@@ -21,6 +22,7 @@ export default function App() {
           <Route path="company" element={<CompanyInvestigationPage />} />
           <Route path="portfolio" element={<PortfolioImpactPage />} />
           <Route path="mitigation" element={<MitigationStudioPage />} />
+          <Route path="insurance" element={<InsurancePage />} />
           <Route path="evidence" element={<EvidenceReportsPage />} />
         </Route>
       </Routes>
