@@ -120,7 +120,7 @@ export default function DependencyExplorerPage() {
     return BASE_LAYOUT.nodes.map((n) => {
       const inChain = chain ? chain.nodes.has(n.id) : scenarioReach.nodes.has(n.id)
       const inMatch = matchedIds ? matchedIds.has(n.id) : true
-      const stressedElCr = inChain && n.data.gnode.kind === 'company' ? stressedElById.get(n.id) : undefined
+      const stressedElCr = inChain && (n.data as { gnode: GNode }).gnode.kind === 'company' ? stressedElById.get(n.id) : undefined
       return {
         ...n,
         data: { ...n.data, dimmed: !inChain || !inMatch, active: inChain, selected: n.id === selectedId, stressedElCr },

@@ -37,7 +37,7 @@ export type CopilotBlock =
   | { kind: 'heading'; text: string }
   | { kind: 'bullets'; items: string[] }
   | { kind: 'stat'; label: string; value: string; sub?: string; evidence?: EvidenceClass }
-  | { kind: 'statRow'; stats: { label: string; value: string; evidence?: EvidenceClass }[] }
+  | { kind: 'statRow'; stats: { label: string; value: string; sub?: string; evidence?: EvidenceClass }[] }
   | {
       kind: 'rankedList'
       title: string

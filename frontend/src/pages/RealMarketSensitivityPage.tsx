@@ -2,12 +2,7 @@ import { AlertTriangle, ExternalLink, Search, Sparkles } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import PageHeader from '../components/PageHeader'
 import { searchNews, type NewsArticle } from '../lib/api'
-import {
-  DIRECTION_META,
-  rankBySensitivity,
-  type RealMarketEntity,
-  type SensitivityResult,
-} from '../lib/realMarketSensitivity'
+import { DIRECTION_META, rankBySensitivity, type SensitivityResult } from '../lib/realMarketSensitivity'
 import { useScenarioStore } from '../store/useScenarioStore'
 
 export default function RealMarketSensitivityPage() {

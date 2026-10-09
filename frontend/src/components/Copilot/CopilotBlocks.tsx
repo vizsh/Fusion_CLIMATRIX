@@ -72,6 +72,7 @@ export function CopilotBlockView({
                 <EvidenceDot cls={s.evidence} />
               </div>
               <div className="font-mono text-[13px] font-semibold text-white">{s.value}</div>
+              {s.sub && <div className="text-[9px] text-slate-500">{s.sub}</div>}
             </div>
           ))}
         </div>

@@ -220,7 +220,7 @@ export async function respondTo(message: string, state: ScenarioState): Promise<
     // alias list (resolveScenario falls back to the active dashboard
     // region if neither names one) — more reliable than an 8B model's
     // guess, and cheaper (see ollamaClient.ts).
-    return { blocks: runIntent(picked.intent, { region: detectRegion(text), horizon: detectHorizon(text) }, state) }
+    return { blocks: runIntent(picked.intent, { region: detectRegion(text) ?? undefined, horizon: detectHorizon(text) }, state) }
   }
 
   // Neither a rule nor the local model was confident — ask rather than
