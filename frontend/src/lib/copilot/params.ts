@@ -63,6 +63,52 @@ export function detectUnmappedCity(text: string) {
   return UNMAPPED_CITIES.find((c) => c.terms.some((t) => lower.includes(t))) ?? null
 }
 
+/** Every region named in the text, in first-mention order — used for
+ * "compare X and Y" questions, unlike detectRegion's single-best-match. */
+export function detectRegions(text: string): Region[] {
+  const lower = text.toLowerCase()
+  const found: Region[] = []
+  for (const { region, terms } of REGION_ALIASES) {
+    if (!found.includes(region) && terms.some((t) => lower.includes(t))) found.push(region)
+  }
+  return found
+}
+
+// Direct scenario-dial control from free text — "set severity to 85", the
+// gap that made the Copilot describe the scenario but never actually set
+// it. Each detector requires its own literal keyword next to the number,
+// not a bare digit, so an unrelated sentence that happens to contain a
+// number doesn't misfire.
+export function detectSeverity(text: string): number | null {
+  const m = text.match(/severity\s*(?:to|of|at|=|:)?\s*(\d{1,3})/i)
+  if (!m) return null
+  const n = parseInt(m[1], 10)
+  return n >= 0 && n <= 100 ? n : null
+}
+
+export function detectDurationMonths(text: string): number | null {
+  const m = text.match(/(\d{1,2})\s*[- ]?month/i) ?? text.match(/duration\s*(?:to|of|=|:)?\s*(\d{1,2})/i)
+  if (!m) return null
+  const n = parseInt(m[1], 10)
+  return n >= 1 && n <= 36 ? n : null
+}
+
+export function detectSubstitutability(text: string): Substitutability | null {
+  if (!/substitutab/i.test(text)) return null
+  const lower = text.toLowerCase()
+  if (/\blimited\b/.test(lower)) return 'Limited'
+  if (/\bstrong\b/.test(lower)) return 'Strong'
+  if (/\bmoderate\b/.test(lower)) return 'Moderate'
+  return null
+}
+
+export function detectUserMode(text: string): 'bank' | 'investor' | null {
+  const lower = text.toLowerCase()
+  if (/\b(switch to|use|act as an?)\s+investor\b|\binvestor (mode|view|lens)\b/.test(lower)) return 'investor'
+  if (/\b(switch to|use|act as an?)\s+bank\b|\bbank (mode|view|lens)\b/.test(lower)) return 'bank'
+  return null
+}
+
 export type Horizon = 'near' | 'medium' | 'long' | 'both'
 
 export function detectHorizon(text: string): Horizon {

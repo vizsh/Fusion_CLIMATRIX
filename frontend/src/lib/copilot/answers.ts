@@ -14,11 +14,21 @@
 // Both produce the exact same CopilotBlock[] rendering, so the UI can't
 // tell (or disagree on figures) depending on which path answered.
 
-import { computeBottlenecks, institutionExposureToHazard, REGION_HAZARD, totalPortfolioEAD } from '../graphAnalytics'
-import { computeInsurerBook, computeProtectionGap, allInsurers, formatLossRatio } from '../insurance'
+import {
+  companyExposureDetail,
+  computeBottlenecks,
+  directFinanciers,
+  getAncestors,
+  institutionExposureToHazard,
+  REGION_HAZARD,
+  totalPortfolioEAD,
+} from '../graphAnalytics'
+import { computeInsuranceAdjustedCredit, computeInsurerBook, computeProtectionGap, allInsurers, formatLossRatio } from '../insurance'
+import { getWeatherAnomalies, semanticSearch } from '../api'
 import { NODES } from '../indiaGraphData'
+import { sectorVulnerability } from '../sectorVulnerability'
 import { WEATHER_WINDOWS } from '../weatherWindows'
-import { REGION_LABEL, computeImpact } from '../../store/useScenarioStore'
+import { REGION_LABEL, computeImpact, stressPdLgd, type ScenarioState } from '../../store/useScenarioStore'
 import type { Region } from '../../store/useScenarioStore'
 import {
   ALL_REGIONS,
@@ -27,7 +37,7 @@ import {
   PROBABILITY_BASIS_LABEL,
   type Horizon,
 } from './engine'
-import { fmtCr, type ScenarioParams } from './params'
+import { detectDurationMonths, detectSeverity, detectSubstitutability, detectUserMode, fmtCr, resolveScenario, type ScenarioParams } from './params'
 import type { CopilotBlock, CopilotAction } from './types'
 
 function evidenceNote(text: string): CopilotBlock {
@@ -448,6 +458,268 @@ export function findInstitutionByName(query: string) {
   return null
 }
 
+// Matching on a bare short word used to false-match ("Ltd" inside "Ltd.",
+// "Mills" being common) — same whole-word-on-a-distinctive-token rule as
+// findInstitutionByName, applied to companies.
+const COMPANY_GENERIC_WORDS = new Set([
+  'ltd', 'pvt', 'co', 'cooperative', 'federation', 'mills', 'works', 'exports',
+  'processors', 'services', 'india', 'the', 'and', 'of', 'company', 'corp',
+])
+
+export function findCompanyByName(query: string) {
+  const lower = query.toLowerCase()
+  for (const n of NODES) {
+    if (n.kind !== 'company') continue
+    const words = n.label
+      .toLowerCase()
+      .replace(/[—–-]/g, ' ')
+      .split(/\s+/)
+      .filter((w) => w.length >= 4 && !COMPANY_GENERIC_WORDS.has(w))
+    if (words.some((w) => new RegExp(`\\b${w}\\b`).test(lower))) return n
+  }
+  return null
+}
+
+/** Direct, free-text scenario control — "set severity to 85 and make
+ * substitutability limited" actually moves the live dials (not just
+ * describes what they'd show), then confirms with the recomputed figure.
+ * This is the one place the Copilot WRITES state instead of only reading
+ * it — every other answer function is a pure read over the engine. */
+export function answerSetScenario(state: ScenarioState, text: string): CopilotBlock[] {
+  const severity = detectSeverity(text)
+  const durationMonths = detectDurationMonths(text)
+  const substitutability = detectSubstitutability(text)
+  const mode = detectUserMode(text)
+
+  const changes: string[] = []
+  if (severity !== null) {
+    state.setSeverity(severity)
+    changes.push(`Severity → ${severity}/100`)
+  }
+  if (durationMonths !== null) {
+    state.setDuration(durationMonths)
+    changes.push(`Duration → ${durationMonths} month(s)`)
+  }
+  if (substitutability) {
+    state.setSubstitutability(substitutability)
+    changes.push(`Substitutability → ${substitutability}`)
+  }
+  if (mode) {
+    state.setUserMode(mode)
+    changes.push(`Lens → ${mode === 'bank' ? 'Bank' : 'Investor'}`)
+  }
+
+  const p = resolveScenario(undefined, state)
+  const impact = computeImpact({
+    region: p.region,
+    severity: p.severity,
+    durationMonths: p.durationMonths,
+    substitutability: p.substitutability,
+    interventions: state.interventions,
+  })
+
+  return [
+    { kind: 'heading', text: 'Scenario updated' },
+    { kind: 'bullets', items: changes },
+    {
+      kind: 'statRow',
+      stats: [
+        { label: 'Active region', value: REGION_LABEL[p.region], evidence: 'assumption' },
+        { label: 'Stressed EL (recomputed)', value: fmtCr(impact.stressedEl), evidence: 'modelled' },
+      ],
+    },
+    { kind: 'text', text: 'Applied directly to the live scenario — every dashboard page now reflects this, not just this chat.' },
+    { kind: 'actions', actions: [{ id: 'open-scenario-after-set', label: 'Open Scenario Lab to see it', kind: 'navigate', to: '/scenario' }] },
+  ]
+}
+
+export function answerCompanyLookup(companyId: string, p: ScenarioParams): CopilotBlock[] | null {
+  const company = NODES.find((n) => n.id === companyId)
+  if (!company) return null
+
+  const { hazards, directInfra, indirectInfra, suppliers, directInfraParent } = companyExposureDetail(company.id)
+  const activeHazardId = REGION_HAZARD[p.region]
+  const { nodes: ancestorIds } = getAncestors(company.id)
+  const inScenario = ancestorIds.has(activeHazardId)
+  const vulnerability = sectorVulnerability(company.sector)
+  const { stressedPd, stressedLgd } = stressPdLgd(
+    company.baselinePd ?? 0,
+    company.baselineLgd ?? 0,
+    p.severity,
+    p.durationMonths,
+    p.substitutability,
+    vulnerability,
+  )
+  const eadCr = company.eadCr ?? 0
+  const stressedEl = eadCr * stressedPd * stressedLgd
+  const insuranceAdjusted = inScenario ? computeInsuranceAdjustedCredit(company, stressedPd, stressedLgd, p.severity, p.durationMonths) : null
+  const financiers = directFinanciers(company.id)
+
+  const pathSentence = directInfraParent
+    ? `Directly dependent on ${directInfra.map((i) => i.label).join(' and ')}.${indirectInfra.length ? ` Also indirectly linked to ${indirectInfra.map((n) => n.label).join(', ')} through a shared supplier.` : ''}`
+    : hazards.length
+      ? `Indirectly exposed — the path runs through ${[...indirectInfra, ...suppliers].map((n) => n.label).join(' → ') || 'a supplier'}.`
+      : 'No hazard dependency is traced to this company in the current graph.'
+
+  return [
+    { kind: 'heading', text: `${company.label} — ${REGION_LABEL[p.region]} scenario` },
+    {
+      kind: 'text',
+      text: inScenario
+        ? `Exposed to the active scenario (severity ${p.severity}/100). ${pathSentence}`
+        : `Not reachable from ${REGION_LABEL[p.region]}'s hazard under the current graph. ${pathSentence}`,
+    },
+    {
+      kind: 'statRow',
+      stats: [
+        { label: 'Exposure at default (EAD)', value: fmtCr(eadCr), evidence: 'synthetic' },
+        { label: 'Stressed PD / LGD', value: `${(stressedPd * 100).toFixed(1)}% / ${(stressedLgd * 100).toFixed(1)}%`, evidence: 'modelled' },
+        { label: 'Stressed EL', value: fmtCr(stressedEl), evidence: 'modelled' },
+      ],
+    },
+    insuranceAdjusted
+      ? {
+          kind: 'text',
+          text: `Insured by ${insuranceAdjusted.insurer.label} — the modeled claim payout offsets ₹${insuranceAdjusted.insuranceOffsetCr.toFixed(2)} cr of loss, bringing the insurance-adjusted EL to ₹${insuranceAdjusted.effectiveEl.toFixed(2)} cr.`,
+        }
+      : inScenario
+        ? { kind: 'text', text: 'No insurance coverage traced for this company — the full stressed loss above is uninsured.' }
+        : evidenceNote('Insurance status not evaluated — this company is outside the current scenario.'),
+    { kind: 'text', text: financiers.length ? `Financed by: ${financiers.map((f) => f.label).join(', ')}.` : 'No financier traced in the graph.' },
+    {
+      kind: 'actions',
+      actions: [
+        { id: 'select-company', label: 'Open full Company Investigation', kind: 'select-entity', entityId: company.id },
+        { id: 'open-dependency-co', label: 'Trace it on the Dependency Explorer', kind: 'navigate', to: '/dependency' },
+      ],
+    },
+  ]
+}
+
+/** "Compare Himachal Pradesh and Mumbai" — runs the identical engine under
+ * matched dials for two named regions, so the comparison is apples-to-
+ * apples rather than each region's own last-left scenario. */
+export function answerCompareRegions(regionA: Region, regionB: Region, p: ScenarioParams): CopilotBlock[] {
+  const common = { severity: p.severity, durationMonths: p.durationMonths, substitutability: p.substitutability, interventions: [] as string[] }
+  const a = computeImpact({ ...common, region: regionA })
+  const b = computeImpact({ ...common, region: regionB })
+  const gapA = computeProtectionGap(REGION_HAZARD[regionA], p.severity, p.durationMonths)
+  const gapB = computeProtectionGap(REGION_HAZARD[regionB], p.severity, p.durationMonths)
+  const worse = a.stressedEl >= b.stressedEl ? regionA : regionB
+
+  return [
+    {
+      kind: 'heading',
+      text: `${REGION_LABEL[regionA]} vs ${REGION_LABEL[regionB]} — same dials (severity ${p.severity}/100, ${p.durationMonths}mo, ${p.substitutability})`,
+    },
+    {
+      kind: 'table',
+      headers: ['', REGION_LABEL[regionA], REGION_LABEL[regionB]],
+      rows: [
+        ['Companies reached', String(a.companyCount), String(b.companyCount)],
+        ['EAD at risk', fmtCr(a.eadCr), fmtCr(b.eadCr)],
+        ['Stressed EL', fmtCr(a.stressedEl), fmtCr(b.stressedEl)],
+        ['Protection gap', `${(gapA.protectionGapShare * 100).toFixed(0)}%`, `${(gapB.protectionGapShare * 100).toFixed(0)}%`],
+      ],
+    },
+    {
+      kind: 'text',
+      text: `${REGION_LABEL[worse]} shows the higher stressed loss under this common stress test — both sides computed from the identical formula and dials, so the comparison isn't an artifact of different assumptions.`,
+    },
+    {
+      kind: 'actions',
+      actions: [
+        { id: 'cmp-a', label: `Open ${REGION_LABEL[regionA]} in Scenario Lab`, kind: 'navigate', to: '/scenario', region: regionA },
+        { id: 'cmp-b', label: `Open ${REGION_LABEL[regionB]} in Scenario Lab`, kind: 'navigate', to: '/scenario', region: regionB },
+      ],
+    },
+  ]
+}
+
+export function answerMethodology(): CopilotBlock[] {
+  return [
+    { kind: 'heading', text: 'How these numbers are actually calculated' },
+    { kind: 'text', text: "Every figure in CLIMATRIX traces to one of these disclosed formulas — nothing is a black-box score, and I'll never show a number the dashboard can't reproduce." },
+    {
+      kind: 'bullets',
+      items: [
+        'Stressed PD/LGD: baseline PD/LGD scaled by (severity/100) × sector vulnerability × substitutability multiplier × duration factor — stressPdLgd() in useScenarioStore.ts.',
+        'Expected credit loss: EAD × stressed PD × stressed LGD, summed per company — never a blended portfolio average.',
+        'Protection gap: of every company a scenario reaches, the EAD share with zero INSURED_BY edge in the graph.',
+        'Insurance claim estimate: sum insured × severity-scaled disruption fraction, net of deductible — the same mechanic the equity lens uses for revenue-at-risk.',
+        'Parametric trigger: a fixed payout once severity crosses a disclosed threshold, exactly ₹0 one point under it — real basis risk, not a smoothed curve.',
+        'Sector vulnerability multiplier: a disclosed table (Tourism 1.45×, Agriculture 1.35× … IT/BPO 0.5×) — an assumption, not a calibrated empirical result.',
+      ],
+    },
+    {
+      kind: 'text',
+      text: 'See Evidence & Reports for the full sourced/modelled/assumption/synthetic breakdown, or open the Dependency Explorer and expand "Show the math" for a live step-by-step trace on the top company in your current scenario.',
+    },
+    { kind: 'actions', actions: [{ id: 'open-evidence-method', label: 'Open Evidence & Reports', kind: 'navigate', to: '/evidence' }] },
+  ]
+}
+
+/** Backend bridge #1 — real TF-IDF semantic search (scikit-learn) over
+ * whatever news/evidence the backend has already fetched, instead of the
+ * Copilot staying 100% frontend-only. Fails honestly if the backend isn't
+ * running, matching every connector's own "never fake success" pattern. */
+export async function answerBackendNewsSearch(query: string): Promise<CopilotBlock[]> {
+  try {
+    const result = await semanticSearch(query, 'news', 5)
+    if (!result.hits.length) {
+      return [
+        {
+          kind: 'text',
+          text: `No semantically similar news found for "${query}" among articles already fetched. Try Evidence & Reports' live news panel first to pull in fresh articles, then ask again.`,
+        },
+      ]
+    }
+    return [
+      { kind: 'heading', text: `Semantic search — "${query}"` },
+      {
+        kind: 'rankedList',
+        title: 'Most topically similar (not just keyword match)',
+        rows: result.hits.map((h, i) => ({ rank: i + 1, label: h.title, value: `${(h.score * 100).toFixed(0)}% match`, sub: h.kind, evidence: 'sourced' as const })),
+      },
+      { kind: 'text', text: `Backend TF-IDF + cosine similarity (${result.method}) — ranks by topic, so "crop failure" surfaces a drought article even without an exact keyword match.` },
+    ]
+  } catch {
+    return [{ kind: 'text', text: 'Backend not reachable for semantic search — make sure the FastAPI server is running (see backend/README.md).' }]
+  }
+}
+
+/** Backend bridge #2 — real scikit-learn anomaly detection (rolling
+ * z-score + IsolationForest) over this region's actual NASA POWER/
+ * Open-Meteo history, live from the backend built for exactly this. */
+export async function answerWeatherAnomaly(region: Region): Promise<CopilotBlock[]> {
+  const hazard = NODES.find((n) => n.id === REGION_HAZARD[region])
+  if (!hazard?.coords) return [{ kind: 'text', text: "No coordinates traced for this region's hazard node." }]
+  try {
+    const result = await getWeatherAnomalies(hazard.coords[1], hazard.coords[0], 60)
+    const anomalies = result.points.filter((p) => p.is_anomaly)
+    return [
+      { kind: 'heading', text: `Weather anomaly check — ${REGION_LABEL[region]}` },
+      {
+        kind: 'stat',
+        label: anomalies.length ? `${anomalies.length} anomalous day(s) found` : 'No anomalies found',
+        value: `${result.points.length} days scanned`,
+        evidence: 'modelled',
+      },
+      ...(anomalies.length
+        ? [
+            {
+              kind: 'bullets',
+              items: anomalies.slice(0, 5).map((a) => `${a.date}: ${a.value.toFixed(1)}mm — z=${a.z_score.toFixed(1)} vs. this location's own baseline of ${a.baseline_mean.toFixed(1)}mm`),
+            } as CopilotBlock,
+          ]
+        : []),
+      { kind: 'text', text: result.method_note },
+    ]
+  } catch {
+    return [{ kind: 'text', text: 'Backend not reachable for live weather anomaly detection — make sure the FastAPI server is running on :8000.' }]
+  }
+}
+
 export function answerHelp(): CopilotBlock[] {
   return [
     { kind: 'heading', text: 'CLIMATRIX AI Copilot' },
@@ -460,9 +732,13 @@ export function answerHelp(): CopilotBlock[] {
       items: [
         'Analyse my portfolio and give me the risks.',
         "What if there's a flood in Mumbai — how would that affect my portfolio?",
+        'Set severity to 85 and duration to 9 months.',
+        "What's the exposure for Kullu Apple Growers Federation?",
+        'Compare Himachal Pradesh and Kerala.',
+        'How is expected credit loss actually calculated?',
+        'Has anything anomalous happened with the weather in Himachal Pradesh?',
+        'Search news about drought in Marathwada.',
         'Which of my investments are exposed to risky transport routes in Himachal Pradesh?',
-        'Automatically test the most relevant climate scenarios for Kerala.',
-        'How could this scenario affect earnings, cash flow and valuation?',
         'Which exposures may be uninsured or underinsured?',
         'What is the RBI compliance angle here?',
         'Guide me to the map and show live movement for Mumbai.',

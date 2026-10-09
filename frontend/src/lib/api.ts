@@ -193,3 +193,55 @@ export function getCopilotStatus() {
 export function postCopilotClassify(body: { model: string; prompt: string; schema: unknown; max_tokens?: number }) {
   return request<any>('/api/copilot/classify', { method: 'POST', body: JSON.stringify(body) }, 90000)
 }
+
+// --- Backend bridge for the Copilot — these two make the Copilot actually
+// use the backend's ML/NLP layer instead of staying 100% frontend-only. ---
+
+export interface SemanticSearchHit {
+  id: string
+  kind: string
+  title: string
+  score: number
+}
+
+export interface SemanticSearchResult {
+  query: string
+  hits: SemanticSearchHit[]
+  method: string
+  evidence_class: string
+}
+
+export function semanticSearch(q: string, kind: 'news' | 'evidence' | 'all' = 'all', topK = 5) {
+  return request<SemanticSearchResult>(
+    `/api/search/semantic?q=${encodeURIComponent(q)}&kind=${kind}&top_k=${topK}`,
+    undefined,
+    10000,
+  )
+}
+
+export interface AnomalyPoint {
+  date: string
+  value: number
+  baseline_mean: number
+  baseline_std: number
+  z_score: number
+  isolation_forest_score: number
+  is_anomaly: boolean
+  method_agreement: boolean
+}
+
+export interface WeatherAnomalyResult {
+  lat: number
+  lng: number
+  points: AnomalyPoint[]
+  anomaly_count: number
+  method_note: string
+}
+
+export function getWeatherAnomalies(lat: number, lng: number, days = 60) {
+  return request<WeatherAnomalyResult>(
+    `/api/weather/anomalies?lat=${lat}&lng=${lng}&days=${days}`,
+    undefined,
+    25000, // cold-cache NASA POWER fetch + ML scoring can take a few seconds
+  )
+}

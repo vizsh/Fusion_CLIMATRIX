@@ -15,8 +15,11 @@
 
 import { classifyIntent } from './ollamaClient'
 import {
+  answerBackendNewsSearch,
   answerBrief,
   answerClimateNews,
+  answerCompanyLookup,
+  answerCompareRegions,
   answerCompliance,
   answerDependency,
   answerExposure,
@@ -25,15 +28,30 @@ import {
   answerHelp,
   answerInsurance,
   answerInstitution,
+  answerMethodology,
   answerPortfolio,
   answerRunSimulation,
+  answerSetScenario,
   answerUnmappedCity,
+  answerWeatherAnomaly,
   answerWhatIf,
+  findCompanyByName,
   findInstitutionByName,
 } from './answers'
 import { answerTour } from './tours'
 import { runIntent } from './tools'
-import { detectHorizon, detectRegion, detectUnmappedCity, resolveScenario, type ScenarioParams } from './params'
+import {
+  detectDurationMonths,
+  detectHorizon,
+  detectRegion,
+  detectRegions,
+  detectSeverity,
+  detectSubstitutability,
+  detectUnmappedCity,
+  detectUserMode,
+  resolveScenario,
+  type ScenarioParams,
+} from './params'
 import type { Region, ScenarioState } from '../../store/useScenarioStore'
 import type { CopilotBlock } from './types'
 
@@ -54,12 +72,35 @@ function paramsFor(text: string, ctx: Ctx): ScenarioParams {
 }
 
 const RULES: { test: (t: string) => boolean; handler: (ctx: Ctx, t: string) => CopilotBlock[] | null }[] = [
+  // Imperative dial-setting checked FIRST — "set severity to 85" is a
+  // command, not a question, and should win over any keyword overlap with
+  // the exposure/insurance rules below (e.g. "set severity to 90 for the
+  // insurance view" still just sets the dial).
+  {
+    test: (t) => detectSeverity(t) !== null || detectDurationMonths(t) !== null || detectSubstitutability(t) !== null || detectUserMode(t) !== null,
+    handler: (ctx, t) => {
+      const region = detectRegion(t)
+      if (region) ctx.state.setRegion(region)
+      return answerSetScenario(ctx.state, t)
+    },
+  },
   {
     test: (t) =>
       /guide me through|tour of (this|the) (app|prototype|platform)|show me around|what (can|does) (this|the) (app|prototype)\b.{0,20}\bdo\b|\ball (the )?features\b|\bwalk me through\b/i.test(
         t,
       ),
     handler: () => answerTour(),
+  },
+  {
+    test: (t) => /how (is|are|does)\b.*\b(calculat|comput|deriv)|explain the formula|methodolog|what does severity mean/i.test(t),
+    handler: () => answerMethodology(),
+  },
+  {
+    test: (t) => (/\bcompar|\bvs\.?\b|\bversus\b|which (region|one) is (worse|riskier|safer|better)/i.test(t)) && detectRegions(t).length >= 2,
+    handler: (ctx, t) => {
+      const [a, b] = detectRegions(t)
+      return answerCompareRegions(a, b, resolveScenario({ region: a }, ctx.state))
+    },
   },
   {
     test: (t) =>
@@ -98,6 +139,13 @@ const RULES: { test: (t: string) => boolean; handler: (ctx: Ctx, t: string) => C
     handler: (ctx, t) => {
       const inst = findInstitutionByName(t)
       return inst ? answerInstitution(inst.id, regionOrCurrent(t, ctx)) : null
+    },
+  },
+  {
+    test: (t) => !!findCompanyByName(t),
+    handler: (ctx, t) => {
+      const company = findCompanyByName(t)
+      return company ? answerCompanyLookup(company.id, paramsFor(t, ctx)) : null
     },
   },
   // Deliberately narrower than earlier drafts: a bare "risk" or "holding"
@@ -143,6 +191,18 @@ export async function respondTo(message: string, state: ScenarioState): Promise<
   if (!detectRegion(text)) {
     const unmapped = detectUnmappedCity(text)
     if (unmapped) return { blocks: answerUnmappedCity(unmapped) }
+  }
+
+  // Backend-bridge intents — genuinely async (a live HTTP call to the
+  // FastAPI backend's ML/NLP layer), so they're checked here rather than
+  // through the synchronous RULES list. Specific enough phrasing that
+  // they won't shadow the sync rules below for an ordinary question.
+  if (/\banomal\w*|unusual weather|something changed|weird weather|weather (going|gone) wrong/i.test(text)) {
+    return { blocks: await answerWeatherAnomaly(regionOrCurrent(text, ctx)) }
+  }
+  const semanticMatch = text.match(/\bsearch (?:news |evidence )?(?:for|about)\s+(.+)/i) ?? text.match(/\bfind (?:news|articles|evidence) (?:about|on)\s+(.+)/i)
+  if (semanticMatch) {
+    return { blocks: await answerBackendNewsSearch(semanticMatch[1].trim()) }
   }
 
   const ruleMatch = matchRules(text, ctx)

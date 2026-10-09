@@ -26,9 +26,9 @@ import { CopilotBlockView } from './CopilotBlocks'
 
 const SUGGESTIONS = [
   'Analyse my portfolio and give me the risks',
-  "What if there's a severe flood in Mumbai?",
-  'Guide me through this app',
-  'Which exposures may be uninsured?',
+  'Set severity to 90 and duration to 9 months',
+  'Compare Himachal Pradesh and Mumbai',
+  'How is expected credit loss actually calculated?',
 ]
 
 let turnSeq = 0

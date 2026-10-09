@@ -74,6 +74,17 @@ which nodes the new scenario reaches and updates a live impact panel —
 company count, EAD at risk, baseline→stressed expected loss, protection gap,
 and which sectors are driving the change — with nothing clicked yet.
 
+Company nodes carry a **live stressed-EL badge directly on canvas** — the
+real number, not just a highlight color. Click any edge for a plain-
+language explanation of what that relationship actually means (what
+`DEPENDS_ON` vs. `INSURED_BY` represents) plus its evidence class and
+weight. The evidence-class legend is a real **filter** — hide everything
+but "Sourced" to see exactly how much of the visible graph is a cited fact
+versus a disclosed assumption. And "Show the math" expands a live,
+step-by-step trace (baseline PD/LGD → sector vulnerability → stressed
+PD/LGD → EAD × PD × LGD) proving the top company's number instead of just
+asserting it.
+
 ### Portfolio Impact — the financial transmission, sector by sector
 
 <img src="docs/images/portfolio-impact.jpg" width="100%">
@@ -173,6 +184,30 @@ the "why does this matter" case is made before any dial is touched.
   split per insurer book.
 - Catastrophe-concentration visibility — the same hidden-bottleneck
   detection the bank view uses, applied to an insurer's own book.
+
+### AI Copilot — a guide, not a wrapper around an LLM
+- **Rules-first, local-model fallback**: precise regex rules resolve most
+  messages for free and instantly; a local Ollama model is consulted only
+  when the rules aren't confident, and even then it only ever picks ONE
+  intent from a closed list — it never computes or writes an answer. Every
+  number the Copilot shows comes from the exact same engine every
+  dashboard page uses, so it can never disagree with what's on screen.
+- **It operates the dashboard, not just describes it** — "set severity to
+  85 and duration to 9 months" actually moves the live scenario dials
+  (every page updates, not just the chat), "guide me to the map" navigates
+  and starts the simulation clock, "download a brief" produces the file.
+- **Company and institution lookup by name** — ask about a specific
+  borrower or bank/insurer and get its live, scenario-adjusted exposure,
+  insurance-adjusted LGD, and dependency path — not a keyword search.
+- **Region comparison** under matched dials, a **methodology explainer**
+  that states the actual formulas, and an autonomous **What-If multi-
+  scenario engine** (four archetypes, ranked by loss/likelihood/priority)
+  plus a cross-region **portfolio overview** — both downloadable as plain-
+  text briefs.
+- **A real bridge to the backend's ML/NLP layer** — "has anything
+  anomalous happened with the weather here" calls the live scikit-learn
+  anomaly detector; "search news about X" calls the live TF-IDF semantic
+  search — the Copilot isn't frontend-only.
 
 ### Scenario engine (shared by every view above)
 - One Zustand store (`useScenarioStore`) is the single source of truth for

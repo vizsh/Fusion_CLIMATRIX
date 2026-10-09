@@ -6,11 +6,15 @@ export interface GraphNodeData {
   dimmed?: boolean
   active?: boolean
   selected?: boolean
+  /** Live stressed EL for this company under the CURRENT scenario, computed
+   * by the page and passed in — shown directly on canvas so the graph
+   * demonstrates the real calculation, not just highlighting. */
+  stressedElCr?: number
   [key: string]: unknown
 }
 
 export default function GraphNode({ data }: NodeProps) {
-  const { gnode, dimmed, active, selected } = data as GraphNodeData
+  const { gnode, dimmed, active, selected, stressedElCr } = data as GraphNodeData
   const meta = KIND_META[gnode.kind]
 
   return (
@@ -40,6 +44,12 @@ export default function GraphNode({ data }: NodeProps) {
           {gnode.eadCr != null && (
             <span className="font-mono-tnum shrink-0 text-slate-400">₹{gnode.eadCr}cr</span>
           )}
+        </div>
+      )}
+      {stressedElCr != null && (
+        <div className="mt-1 flex items-center justify-between rounded border border-risk-high/30 bg-risk-high/[0.08] px-1 py-0.5 text-[8.5px]">
+          <span className="text-risk-high/80">STRESSED EL</span>
+          <span className="font-mono-tnum text-risk-high">₹{stressedElCr.toFixed(1)}cr</span>
         </div>
       )}
       <Handle type="source" position={Position.Right} style={handleStyle(meta.color)} />
