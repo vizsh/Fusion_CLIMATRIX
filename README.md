@@ -166,6 +166,11 @@ the "why does this matter" case is made before any dial is touched.
 - Per-insurer book stress: sum insured, expected net claims, gross loss
   ratio, and what share cedes to a reinsurance treaty
   (`computeInsurerBook`).
+- A second, **PMFBY-style subsidized scheme** insurer alongside the private
+  one — models the real scheme's defining mechanic, where a government
+  subsidy covers most of the actuarial premium so the insured grower pays
+  only a small flat share, shown as an explicit farmer-paid vs. subsidy
+  split per insurer book.
 - Catastrophe-concentration visibility — the same hidden-bottleneck
   detection the bank view uses, applied to an insurer's own book.
 
@@ -356,9 +361,6 @@ docs/                 Design docs, data strategy, this doc set
 
 Not built, scoped and ready to pick up:
 
-- **PMFBY-style state crop insurance** as a government-backed insurer node
-  for the Marathwada drought companies — directly relevant to Indian agri
-  risk transfer.
 - **RBI climate-stress-test-aligned export template** — align the Evidence &
   Reports export format with the RBI's own 2024 pilot methodology.
 - **Scenario comparison mode** — run two scenarios side by side instead of

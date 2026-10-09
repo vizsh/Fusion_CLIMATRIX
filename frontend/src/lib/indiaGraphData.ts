@@ -51,6 +51,10 @@ export interface GNode {
   cededReinsuranceSharePct?: number
   /** Insurer-level: name of the treaty/reinsurer claims are ceded to — disclosed as a field, not a separately graphed entity. */
   reinsurerName?: string
+  /** Insurer-level: share (0-100) of the ACTUARIAL premium a government
+   * subsidy covers — the defining PMFBY mechanic. The insured company only
+   * ever pays the remainder; see lib/insurance.ts computeInsurerBook(). */
+  govtSubsidyPct?: number
 }
 
 export interface GEdge {
@@ -138,7 +142,7 @@ export const NODES: GNode[] = [
   { id: 'co-hp-auto', label: 'Himalayan Auto Components Ltd.', kind: 'company', region: 'HP', sector: 'Manufacturing', coords: [76.8, 30.95], eadCr: 210, baselinePd: 0.018, baselineLgd: 0.32 },
   { id: 'co-hp-pharma', label: 'Baddi Pharmaceuticals Pvt. Ltd.', kind: 'company', region: 'HP', sector: 'Pharmaceuticals', coords: [76.78, 30.94], eadCr: 340, baselinePd: 0.012, baselineLgd: 0.28 },
   { id: 'co-hp-tourism', label: 'Manali Hill Tourism Cooperative', kind: 'company', region: 'HP', sector: 'Tourism', coords: [77.19, 32.25], eadCr: 95, baselinePd: 0.03, baselineLgd: 0.4, sumInsuredCr: 70, premiumRateBps: 180, deductiblePct: 0.1 },
-  { id: 'co-hp-agri', label: 'Kullu Apple Growers Federation', kind: 'company', region: 'HP', sector: 'Agriculture', coords: [77.1, 31.98], eadCr: 65, baselinePd: 0.028, baselineLgd: 0.38 },
+  { id: 'co-hp-agri', label: 'Kullu Apple Growers Federation', kind: 'company', region: 'HP', sector: 'Agriculture', coords: [77.1, 31.98], eadCr: 65, baselinePd: 0.028, baselineLgd: 0.38, sumInsuredCr: 45, premiumRateBps: 300, deductiblePct: 0 },
 
   { id: 'co-kl-tourism', label: 'Alleppey Backwater Resorts Ltd.', kind: 'company', region: 'KL', sector: 'Tourism', coords: [76.35, 9.49], eadCr: 120, baselinePd: 0.027, baselineLgd: 0.37, sumInsuredCr: 90, premiumRateBps: 160, deductiblePct: 0.1 },
   { id: 'co-kl-agri', label: 'Wayanad Plantation Exports Ltd.', kind: 'company', region: 'KL', sector: 'Agriculture', coords: [76.13, 11.6], eadCr: 150, baselinePd: 0.022, baselineLgd: 0.35, sumInsuredCr: 110, premiumRateBps: 220, deductiblePct: 0.15 },
@@ -147,8 +151,8 @@ export const NODES: GNode[] = [
 
   { id: 'co-mh-textile', label: 'Marathwada Textile Mills', kind: 'company', region: 'MH', sector: 'Textiles', coords: [76.5, 19.0], eadCr: 230, baselinePd: 0.025, baselineLgd: 0.36 },
   { id: 'co-mh-agri', label: 'Marathwada Agro Processors Ltd.', kind: 'company', region: 'MH', sector: 'Agro processing', coords: [76.56, 18.41], eadCr: 140, baselinePd: 0.03, baselineLgd: 0.4, sumInsuredCr: 95, premiumRateBps: 240, deductiblePct: 0.15 },
-  { id: 'co-mh-cotton', label: 'Jalna Cotton & Yarn Mills', kind: 'company', region: 'MH', sector: 'Textiles', coords: [75.89, 19.85], eadCr: 110, baselinePd: 0.026, baselineLgd: 0.35 },
-  { id: 'co-mh-dairy', label: 'Solapur Dairy Cooperative', kind: 'company', region: 'MH', sector: 'Dairy', coords: [75.91, 17.68], eadCr: 55, baselinePd: 0.032, baselineLgd: 0.42 },
+  { id: 'co-mh-cotton', label: 'Jalna Cotton & Yarn Mills', kind: 'company', region: 'MH', sector: 'Textiles', coords: [75.89, 19.85], eadCr: 110, baselinePd: 0.026, baselineLgd: 0.35, sumInsuredCr: 60, premiumRateBps: 280, deductiblePct: 0 },
+  { id: 'co-mh-dairy', label: 'Solapur Dairy Cooperative', kind: 'company', region: 'MH', sector: 'Dairy', coords: [75.91, 17.68], eadCr: 55, baselinePd: 0.032, baselineLgd: 0.42, sumInsuredCr: 30, premiumRateBps: 260, deductiblePct: 0 },
 
   { id: 'co-generic-engg', label: 'Deccan Engineering Works', kind: 'company', region: 'National', sector: 'Manufacturing', coords: [73.85, 18.5], eadCr: 175, baselinePd: 0.014, baselineLgd: 0.3 },
   { id: 'co-generic-logistics', label: 'Western Corridor Freight Carriers', kind: 'company', region: 'National', sector: 'Logistics', coords: [72.87, 19.12], eadCr: 90, baselinePd: 0.016, baselineLgd: 0.31 },
@@ -171,6 +175,16 @@ export const NODES: GNode[] = [
     coords: [72.83, 19.02],
     cededReinsuranceSharePct: 40,
     reinsurerName: 'Himalaya Re Catastrophe Treaty',
+  },
+  {
+    id: 'insurer-2',
+    label: 'PMFBY — Pradhan Mantri Fasal Bima Yojana',
+    kind: 'insurer',
+    region: 'National',
+    sector: 'Government crop insurance',
+    coords: [75.3, 19.4],
+    govtSubsidyPct: 75,
+    note: 'Illustrative of the real PMFBY scheme’s structure — a central/state subsidy covers most of the actuarial premium so the insured grower pays only a small flat share. This is a disclosed simplification, not official scheme data; see docs/DATA_STRATEGY.md.',
   },
 
   // ---- Flagship: Uttarakhand construction company (bank + investor scenario) ----
@@ -296,6 +310,12 @@ export const EDGES: GEdge[] = [
   { id: 'i-kltourism', from: 'co-kl-tourism', to: 'insurer-1', type: 'INSURED_BY', evidence: 'synthetic', weight: 1 },
   { id: 'i-klagri', from: 'co-kl-agri', to: 'insurer-1', type: 'INSURED_BY', evidence: 'synthetic', weight: 1 },
   { id: 'i-mhagri', from: 'co-mh-agri', to: 'insurer-1', type: 'INSURED_BY', evidence: 'synthetic', weight: 1 },
+
+  // PMFBY-style subsidized crop cover — the previously worst-uninsured
+  // drought/agri exposure in the graph.
+  { id: 'i-hpagri-pmfby', from: 'co-hp-agri', to: 'insurer-2', type: 'INSURED_BY', evidence: 'synthetic', weight: 1 },
+  { id: 'i-mhcotton-pmfby', from: 'co-mh-cotton', to: 'insurer-2', type: 'INSURED_BY', evidence: 'synthetic', weight: 1 },
+  { id: 'i-mhdairy-pmfby', from: 'co-mh-dairy', to: 'insurer-2', type: 'INSURED_BY', evidence: 'synthetic', weight: 1 },
 
   // Uttarakhand flagship: hazard -> road/bridge -> supplier/company -> bank
   { id: 'e-hz-uk-road', from: 'hz-uk', to: 'infra-uk-road', type: 'AFFECTED_BY', evidence: 'assumption', weight: 3 },

@@ -123,6 +123,11 @@ export interface InsurerBookResult {
   cededSharePct: number
   cededClaimsCr: number
   retainedClaimsCr: number
+  /** Set only for a subsidized scheme (e.g. PMFBY): how the actuarial
+   * premium above actually gets paid for. */
+  govtSubsidyPct: number
+  farmerPaidPremiumCr: number
+  govtSubsidyCr: number
 }
 
 /** One insurer's book under the active scenario, plus how much of its
@@ -144,6 +149,8 @@ export function computeInsurerBook(
   const expectedNetClaimsCr = book.reduce((s, i) => s + i.netClaimCr, 0)
   const cededSharePct = insurer.cededReinsuranceSharePct ?? 0
   const cededClaimsCr = expectedNetClaimsCr * (cededSharePct / 100)
+  const govtSubsidyPct = insurer.govtSubsidyPct ?? 0
+  const govtSubsidyCr = totalPremiumCr * (govtSubsidyPct / 100)
   return {
     insurer,
     policyCount: book.length,
@@ -154,6 +161,9 @@ export function computeInsurerBook(
     cededSharePct,
     cededClaimsCr,
     retainedClaimsCr: expectedNetClaimsCr - cededClaimsCr,
+    govtSubsidyPct,
+    farmerPaidPremiumCr: totalPremiumCr - govtSubsidyCr,
+    govtSubsidyCr,
   }
 }
 

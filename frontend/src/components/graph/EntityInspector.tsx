@@ -311,10 +311,18 @@ function InstitutionStats({ node, onSelect }: { node: GNode; onSelect?: (id: str
           <StatRow label="Underwriting — sum insured in scope" value={`₹${book.totalSumInsuredCr.toFixed(0)} cr`} />
           <StatRow label="Expected net claims — scenario" value={`₹${book.expectedNetClaimsCr.toFixed(2)} cr`} color="#fb3a4a" />
           <StatRow label="Gross loss ratio" value={`${(book.grossLossRatio * 100).toFixed(0)}%`} color="#f5a524" />
-          <StatRow
-            label={`Ceded to ${book.insurer.reinsurerName ?? 'reinsurer'}`}
-            value={`${book.cededSharePct}% · ₹${book.cededClaimsCr.toFixed(2)} cr`}
-          />
+          {book.govtSubsidyPct > 0 ? (
+            <StatRow
+              label={`Govt subsidy (${book.govtSubsidyPct}% of premium)`}
+              value={`₹${book.govtSubsidyCr.toFixed(2)} cr`}
+              color="#2dd4a7"
+            />
+          ) : (
+            <StatRow
+              label={`Ceded to ${book.insurer.reinsurerName ?? 'reinsurer'}`}
+              value={`${book.cededSharePct}% · ₹${book.cededClaimsCr.toFixed(2)} cr`}
+            />
+          )}
         </>
       )}
       {hasExposure && (

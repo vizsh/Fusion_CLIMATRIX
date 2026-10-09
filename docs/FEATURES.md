@@ -86,6 +86,7 @@ screenshots.
 | Severity-scaled claim estimate | Same disruption-fraction mechanic as the equity lens's revenue-at-risk formula, net of deductible | Modeled, disclosed formula |
 | Per-insurer book stress | `computeInsurerBook()` — sum insured, expected net claims, gross loss ratio | Modeled |
 | Reinsurance cession | `cededReinsuranceSharePct` field on the insurer node | Assumption (disclosed) |
+| PMFBY-style subsidized crop cover | Second insurer node (`insurer-2`) with `govtSubsidyPct` — same claim mechanic, but premium is split into farmer-paid vs. government-subsidized shares in `computeInsurerBook()` | Assumption (disclosed), modeling a real scheme's structure |
 | Uninsured-exposed borrower ranking | Sorted by EAD, the actionable output for a coverage-covenant decision | Modeled |
 | Deliberately incomplete coverage (only ~1/4 of companies insured) | `indiaGraphData.ts` — by design, so the gap is a real finding | Synthetic, intentionally realistic |
 

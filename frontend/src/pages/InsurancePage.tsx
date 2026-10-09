@@ -70,7 +70,14 @@ export default function InsurancePage() {
             {books.map((b) => (
               <div key={b!.insurer.id} className="rounded border border-line bg-panel p-3">
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="text-[12px] font-medium text-slate-200">{b!.insurer.label}</span>
+                  <span className="flex items-center gap-1.5 text-[12px] font-medium text-slate-200">
+                    {b!.insurer.label}
+                    {b!.govtSubsidyPct > 0 && (
+                      <span className="rounded border border-risk-low/40 bg-risk-low/10 px-1.5 py-0.5 font-mono text-[8.5px] tracking-wide text-risk-low">
+                        SUBSIDIZED SCHEME
+                      </span>
+                    )}
+                  </span>
                   <span className="font-mono text-[9.5px] text-slate-500">{b!.policyCount} polic{b!.policyCount === 1 ? 'y' : 'ies'} in scope</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-[10.5px] sm:grid-cols-4">
@@ -86,12 +93,21 @@ export default function InsurancePage() {
                     <div className="text-slate-600">Gross loss ratio</div>
                     <div className="font-mono-tnum text-risk-med">{(b!.grossLossRatio * 100).toFixed(0)}%</div>
                   </div>
-                  <div>
-                    <div className="text-slate-600">Ceded to {b!.insurer.reinsurerName ?? 'reinsurer'}</div>
-                    <div className="font-mono-tnum text-slate-300">
-                      {b!.cededSharePct}% · ₹{b!.cededClaimsCr.toFixed(2)} cr
+                  {b!.govtSubsidyPct > 0 ? (
+                    <div>
+                      <div className="text-slate-600">Farmer-paid vs. govt subsidy</div>
+                      <div className="font-mono-tnum text-slate-300">
+                        ₹{b!.farmerPaidPremiumCr.toFixed(2)} cr · ₹{b!.govtSubsidyCr.toFixed(2)} cr ({b!.govtSubsidyPct}%)
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div>
+                      <div className="text-slate-600">Ceded to {b!.insurer.reinsurerName ?? 'reinsurer'}</div>
+                      <div className="font-mono-tnum text-slate-300">
+                        {b!.cededSharePct}% · ₹{b!.cededClaimsCr.toFixed(2)} cr
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-line-soft">
                   <div
@@ -100,8 +116,9 @@ export default function InsurancePage() {
                   />
                 </div>
                 <p className="mt-2 text-[9.5px] leading-relaxed text-slate-600">
-                  Net retained after cession: ₹{b!.retainedClaimsCr.toFixed(2)} cr — the catastrophe-concentration
-                  check every reinsurer runs before renewing a treaty.
+                  {b!.govtSubsidyPct > 0
+                    ? `The insured grower pays only the flat share above — the scheme's central/state subsidy covers the rest of the actuarial premium regardless of this scenario's severity.`
+                    : `Net retained after cession: ₹${b!.retainedClaimsCr.toFixed(2)} cr — the catastrophe-concentration check every reinsurer runs before renewing a treaty.`}
                 </p>
               </div>
             ))}
