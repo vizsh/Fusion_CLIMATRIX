@@ -1,0 +1,53 @@
+{
+  "meta": {
+    "note": "Hazard footprints available to the scenario engine.",
+    "model": "Each footprint is a set of weighted centroids with a radius. Intensity falls off from 1.0 inside the inner 60% of the radius to 0 at the edge. This is a coarse screening footprint, NOT a hydrodynamic inundation or landslide-susceptibility model.",
+    "severity_note": "The severity slider scales these intensities. It is a scenario control - never a probability, a flood depth, or a damage rate.",
+    "caveat": "Relative district severity for the 2023 event reflects the broad pattern in public post-disaster reporting. Exact per-district intensity values are modelled, not measured."
+  },
+  "hazards": [
+    {
+      "id": "IN-FLOOD-HP-2023",
+      "name": "Himachal Pradesh monsoon floods & landslides",
+      "short": "HP 2023",
+      "type": "flood",
+      "year": 2023,
+      "region": "Himachal Pradesh",
+      "evidence": "sourced",
+      "source": "Relative severity informed by HPSDMA post-disaster reporting and the HP Economic Survey 2023-24; per-district intensity values are modelled.",
+      "narrative": "Severe monsoon flooding, cloudbursts and landslides across Himachal Pradesh, with the heaviest damage in the Beas basin districts of Mandi and Kullu.",
+      "centroids": [
+        { "district": "Mandi", "lat": 31.7084, "lon": 76.9319, "intensity": 0.92, "radius_km": 55 },
+        { "district": "Kullu", "lat": 31.9592, "lon": 77.1089, "intensity": 0.88, "radius_km": 50 },
+        { "district": "Shimla", "lat": 31.1048, "lon": 77.1734, "intensity": 0.74, "radius_km": 45 },
+        { "district": "Kangra", "lat": 32.0998, "lon": 76.2691, "intensity": 0.66, "radius_km": 55 },
+        { "district": "Chamba", "lat": 32.5534, "lon": 76.1258, "intensity": 0.61, "radius_km": 50 },
+        { "district": "Kinnaur", "lat": 31.5892, "lon": 78.2673, "intensity": 0.58, "radius_km": 45 },
+        { "district": "Bilaspur", "lat": 31.326, "lon": 76.7592, "intensity": 0.44, "radius_km": 35 },
+        { "district": "Solan", "lat": 30.9045, "lon": 77.0967, "intensity": 0.38, "radius_km": 42 },
+        { "district": "Hamirpur", "lat": 31.6839, "lon": 76.5225, "intensity": 0.35, "radius_km": 32 },
+        { "district": "Sirmaur", "lat": 30.4367, "lon": 77.625, "intensity": 0.33, "radius_km": 40 },
+        { "district": "Una", "lat": 31.4685, "lon": 76.2708, "intensity": 0.29, "radius_km": 30 }
+      ]
+    },
+    {
+      "id": "IN-FLOOD-EXT-090",
+      "name": "Extreme flood stress test (hypothetical)",
+      "short": "Extreme stress",
+      "type": "flood",
+      "year": null,
+      "region": "Himachal Pradesh industrial belt",
+      "evidence": "assumed",
+      "source": "Hypothetical stress-test footprint. Does not reconstruct any specific historical event.",
+      "narrative": "A hypothetical extreme flood centred on the Solan industrial belt rather than the upper Beas basin, used to stress the pharma manufacturing cluster directly.",
+      "centroids": [
+        { "district": "Solan", "lat": 30.9578, "lon": 76.7914, "intensity": 0.95, "radius_km": 45 },
+        { "district": "Sirmaur", "lat": 30.4367, "lon": 77.625, "intensity": 0.72, "radius_km": 45 },
+        { "district": "Shimla", "lat": 31.1048, "lon": 77.1734, "intensity": 0.6, "radius_km": 40 },
+        { "district": "Bilaspur", "lat": 31.326, "lon": 76.7592, "intensity": 0.55, "radius_km": 35 },
+        { "district": "Mandi", "lat": 31.7084, "lon": 76.9319, "intensity": 0.48, "radius_km": 45 },
+        { "district": "Una", "lat": 31.4685, "lon": 76.2708, "intensity": 0.42, "radius_km": 32 }
+      ]
+    }
+  ]
+}

@@ -1,16 +1,14 @@
-import { motion } from 'framer-motion'
-import { Check, SlidersHorizontal, Zap } from 'lucide-react'
+import { Check, SlidersHorizontal, Shield, RotateCcw } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import PageHeader from '../components/PageHeader'
 import ScenarioConsole from '../components/ScenarioConsole'
+import KpiCard from '../components/ui/KpiCard'
+import EvidenceBadge from '../components/ui/EvidenceBadge'
 import { computeBottlenecks, computeHazardReach, REGION_HAZARD } from '../lib/graphAnalytics'
 import { combinedReductionShare, INTERVENTIONS, isParametricTriggered, parametricPayout } from '../lib/interventions'
 import { sectorVulnerability } from '../lib/sectorVulnerability'
 import { computeImpact, REGION_LABEL, stressPdLgd, useScenarioStore } from '../store/useScenarioStore'
 
-// Which bottleneck kind each intervention mechanically targets — used to
-// find a real, scenario-specific node to point at, instead of a generic
-// description that never changes between scenarios.
 const INTERVENTION_TARGET_KIND: Record<string, 'infra' | 'supplier' | null> = {
   'alt-route': 'infra',
   'resilience-infra': 'infra',
@@ -38,12 +36,6 @@ export default function MitigationStudioPage() {
     return scenarioBottlenecks.find((b) => b.node.kind === kind) ?? null
   }
 
-  const mostExposedCompany = reach.companies.slice().sort((a, b) => (b.eadCr ?? 0) - (a.eadCr ?? 0))[0] ?? null
-
-  // Per-company breakdown — who actually benefits from the currently
-  // enabled interventions, not just the portfolio-level aggregate. A
-  // triggered parametric payout is portfolio-level (one treaty), so it's
-  // allocated here pro-rata by each borrower's share of stressed loss.
   const reduction = combinedReductionShare(interventions)
   const payoutCr = parametricPayout(interventions, state.severity)
   const companyRows = useMemo(() => {
@@ -71,217 +63,193 @@ export default function MitigationStudioPage() {
   }, [reach.companies, state.severity, state.durationMonths, state.substitutability, reduction, payoutCr])
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-bg-main">
       <PageHeader
         title="MITIGATION STUDIO"
-        subtitle="ENABLE INTERVENTIONS, RECOMPUTE THE SAME SCENARIO"
-        tag={`ACTIVE SCENARIO: ${REGION_LABEL[state.region]} · ${state.hazard} · ${state.severity}/100`}
+        subtitle="PHYSICAL ADAPTATION, RESILIENCE BUDGETING & NET ECONOMIC BENEFIT"
+        tag={`${REGION_LABEL[state.region]} · ${state.hazard}`}
+        actions={
+          interventions.length > 0 && (
+            <button
+              onClick={clearInterventions}
+              className="flex items-center gap-1.5 rounded border border-border-subtle bg-bg-card px-2.5 py-1 font-mono text-[10.5px] text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
+            >
+              <RotateCcw size={11} />
+              <span>CLEAR INTERVENTIONS</span>
+            </button>
+          )
+        }
       />
 
-      <div className="border-b border-line bg-panel/40">
+      <div className="border-b border-border-subtle bg-bg-secondary/70 backdrop-blur-sm">
         <button
           onClick={() => setShowConsole((v) => !v)}
-          className="flex w-full items-center gap-1.5 px-3 py-1.5 font-mono text-[9.5px] tracking-[0.15em] text-slate-500 hover:text-slate-300"
+          className="flex w-full items-center gap-2 px-4 py-2 font-mono text-[10px] tracking-[0.14em] text-text-muted hover:text-text-primary transition-colors cursor-pointer"
         >
-          <SlidersHorizontal size={11} className="text-cyan" />
-          SCENARIO {showConsole ? '▾' : '▸'}
+          <SlidersHorizontal size={11} className="text-accent-teal" />
+          <span>SCENARIO CONTROLLER {showConsole ? '▾' : '▸'}</span>
         </button>
         {showConsole && (
-          <div className="border-t border-line-soft px-1 pb-1">
+          <div className="border-t border-border-subtle/50 px-2 pb-2">
             <ScenarioConsole compact />
           </div>
         )}
       </div>
 
-      <div className="bg-grid p-6">
-        <div className="mb-2 flex items-center justify-between">
-          <div className="font-mono text-[10px] tracking-[0.15em] text-slate-500">
-            AVAILABLE INTERVENTIONS — {reach.companies.length} BORROWER(S) IN SCOPE
-          </div>
-          {interventions.length > 0 && (
-            <button onClick={clearInterventions} className="font-mono text-[9.5px] text-slate-500 hover:text-slate-300">
-              CLEAR ALL
-            </button>
-          )}
-        </div>
-        <div className="mb-6 grid grid-cols-1 gap-3 lg:grid-cols-4">
-          {INTERVENTIONS.map((i) => {
-            const enabled = interventions.includes(i.id)
-            const target = targetFor(i.id)
-            const noTarget = INTERVENTION_TARGET_KIND[i.id] && !target
-            return (
-              <button
-                key={i.id}
-                onClick={() => toggleIntervention(i.id)}
-                className={`rounded-lg border p-3 text-left transition-colors ${
-                  enabled ? 'border-cyan/50 bg-cyan/10' : 'border-line bg-panel-2 hover:border-slate-600'
-                }`}
-              >
-                <div className="mb-1 flex items-center justify-between">
-                  <span className={`font-mono text-[11px] ${enabled ? 'text-cyan' : 'text-slate-300'}`}>{i.label}</span>
-                  {enabled && <Check size={13} className="text-cyan" />}
-                </div>
-                <p className="text-[10.5px] leading-relaxed text-slate-500">{i.description}</p>
-                {target && (
-                  <div className="mt-2 rounded border border-risk-med/30 bg-risk-med/[0.06] px-1.5 py-1 text-[10px] text-risk-med">
-                    Targets: {target.node.label} (₹{target.reachedEAD} cr via {target.reachedCompanies.length} borrowers)
-                  </div>
-                )}
-                {i.id === 'early-engagement' && mostExposedCompany && (
-                  <div className="mt-2 rounded border border-risk-med/30 bg-risk-med/[0.06] px-1.5 py-1 text-[10px] text-risk-med">
-                    Targets: {mostExposedCompany.label} (most exposed, ₹{mostExposedCompany.eadCr} cr)
-                  </div>
-                )}
-                {noTarget && (
-                  <div className="mt-2 rounded border border-line px-1.5 py-1 text-[10px] text-slate-600">
-                    No matching bottleneck in this scenario
-                  </div>
-                )}
-                {i.kind === 'parametric' && (
-                  <div className="mt-2 space-y-1.5">
-                    <div className="flex items-center justify-between text-[10px] text-slate-500">
-                      <span>Trigger</span>
-                      <span className="text-slate-400">severity ≥ {i.triggerSeverityThreshold}/100</span>
-                    </div>
-                    <div className="flex items-center justify-between text-[10px] text-slate-500">
-                      <span>Payout if triggered</span>
-                      <span className="text-slate-400">₹{i.payoutCr} cr fixed</span>
-                    </div>
-                    <div
-                      className={`flex items-center gap-1 rounded border px-1.5 py-1 font-mono text-[9.5px] tracking-wide ${
-                        isParametricTriggered(i, state.severity)
-                          ? 'border-risk-low/40 bg-risk-low/10 text-risk-low'
-                          : 'border-line text-slate-600'
-                      }`}
-                    >
-                      <Zap size={10} />
-                      {isParametricTriggered(i, state.severity)
-                        ? `TRIGGERED — ₹${i.payoutCr} cr released`
-                        : `NOT TRIGGERED at severity ${state.severity}`}
-                    </div>
-                  </div>
-                )}
-                <div className="mt-2 font-mono-tnum text-[11px] text-slate-400">
-                  {i.kind === 'parametric' ? 'Premium' : 'Cost'}: ₹{i.costCr} cr
-                </div>
-              </button>
-            )
-          })}
-        </div>
+      <div className="p-4 sm:p-6 lg:p-7 space-y-6">
+        {/* KPI Row */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <KpiCard
+            label="Gross Stressed Loss"
+            value={`₹${impact.stressedEl.toFixed(1)}`}
+            unit="Cr"
+            comparison="Unmitigated ECL"
+            comparisonTone="coral"
+            evidence="modelled"
+          />
 
-        <motion.div
-          key={interventions.join(',')}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25 }}
-          className="grid grid-cols-1 gap-4 lg:grid-cols-3"
-        >
-          <div className="rounded-lg border border-line bg-panel-2 p-5">
-            <div className="font-mono text-[9px] tracking-[0.15em] text-slate-500">BASELINE</div>
-            <div className="mt-2 font-mono text-2xl font-bold text-slate-300">₹{impact.baselineEl.toFixed(2)} cr</div>
-            <div className="mt-1 text-[10.5px] text-slate-600">No shock applied</div>
-          </div>
-          <div className="rounded-lg border border-risk-high/40 bg-risk-high/[0.06] p-5">
-            <div className="font-mono text-[9px] tracking-[0.15em] text-slate-500">UNMITIGATED STRESS</div>
-            <div className="mt-2 font-mono text-2xl font-bold text-risk-high">₹{impact.stressedEl.toFixed(2)} cr</div>
-            <div className="mt-1 text-[10.5px] text-slate-600">Scenario applied, no intervention</div>
-          </div>
-          <div className="rounded-lg border border-risk-low/40 bg-risk-low/[0.06] p-5">
-            <div className="font-mono text-[9px] tracking-[0.15em] text-slate-500">MITIGATED STRESS</div>
-            <div className="mt-2 font-mono text-2xl font-bold text-risk-low">₹{impact.mitigatedEl.toFixed(2)} cr</div>
-            <div className="mt-1 text-[10.5px] text-slate-600">
-              {interventions.length ? `${interventions.length} intervention(s) applied` : 'Enable an intervention above'}
-            </div>
-          </div>
-        </motion.div>
+          <KpiCard
+            label="Mitigated Expected Loss"
+            value={`₹${impact.mitigatedEl.toFixed(1)}`}
+            unit="Cr"
+            comparison={`₹${impact.avoidedEl.toFixed(1)} Cr Avoided`}
+            comparisonTone="teal"
+            evidence="modelled"
+          />
 
-        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <SummaryCard label="MODELED AVOIDED LOSS" value={`₹${impact.avoidedEl.toFixed(2)} cr`} color="#2dd4a7" />
-          <SummaryCard label="INTERVENTION COST" value={`₹${impact.interventionCostCr.toFixed(1)} cr`} color="#f5a524" />
-          <SummaryCard
-            label="NET MODELED BENEFIT"
-            value={`${netBenefit >= 0 ? '+' : ''}₹${netBenefit.toFixed(2)} cr`}
-            color={netBenefit >= 0 ? '#2dd4a7' : '#fb3a4a'}
+          <KpiCard
+            label="Mitigation Cost"
+            value={`₹${impact.interventionCostCr.toFixed(1)}`}
+            unit="Cr"
+            comparison={`${interventions.length} Active Measures`}
+            comparisonTone="neutral"
+            evidence="assumption"
+          />
+
+          <KpiCard
+            label="Net Economic Benefit"
+            value={`₹${netBenefit.toFixed(1)}`}
+            unit="Cr"
+            comparison={netBenefit > 0 ? 'Net Positive ROI' : 'Capital Consumptive'}
+            comparisonTone={netBenefit > 0 ? 'teal' : 'amber'}
+            evidence="modelled"
           />
         </div>
 
-        {interventions.includes('parametric-trigger') && (
-          <div
-            className={`mt-3 flex items-center justify-between rounded-lg border px-4 py-3 text-[11px] ${
-              impact.parametricPayoutCr > 0
-                ? 'border-risk-low/40 bg-risk-low/[0.06] text-risk-low'
-                : 'border-line bg-panel-2 text-slate-500'
-            }`}
-          >
-            <span className="flex items-center gap-1.5">
-              <Zap size={12} /> Parametric trigger status at severity {state.severity}/100
-            </span>
-            <span className="font-mono-tnum">
-              {impact.parametricPayoutCr > 0
-                ? `TRIGGERED — ₹${impact.parametricPayoutCr.toFixed(0)} cr paid, folded into mitigated EL above`
-                : 'NOT TRIGGERED — ₹0 payout (premium still sunk)'}
-            </span>
-          </div>
-        )}
-
-        <div className="mt-6 rounded-lg border border-line bg-panel-2 p-4">
-          <div className="mb-2 font-mono text-[10px] tracking-[0.15em] text-slate-500">
-            WHO BENEFITS — PER-BORROWER BREAKDOWN
-          </div>
-          {companyRows.length ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-[11px]">
-                <thead>
-                  <tr className="border-b border-line-soft text-left text-[9px] tracking-wide text-slate-500">
-                    <th className="pb-1.5 font-normal">BORROWER</th>
-                    <th className="pb-1.5 font-normal">SECTOR</th>
-                    <th className="pb-1.5 text-right font-normal">STRESSED EL</th>
-                    <th className="pb-1.5 text-right font-normal">MITIGATED EL</th>
-                    <th className="pb-1.5 text-right font-normal">AVOIDED</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {companyRows.map((r) => (
-                    <tr key={r.company.id} className="border-b border-line-soft">
-                      <td className="py-1.5 text-slate-300">{r.company.label}</td>
-                      <td className="py-1.5 text-slate-500">{r.company.sector}</td>
-                      <td className="py-1.5 text-right font-mono-tnum text-risk-high">₹{r.stressedEl.toFixed(2)} cr</td>
-                      <td className="py-1.5 text-right font-mono-tnum text-risk-low">₹{r.mitigatedEl.toFixed(2)} cr</td>
-                      <td className="py-1.5 text-right font-mono-tnum text-cyan">₹{r.avoided.toFixed(2)} cr</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        {/* Interventions Selection Grid */}
+        <div className="rounded-xl border border-border-subtle bg-bg-card p-5 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 font-mono text-[10.5px] font-bold uppercase tracking-[0.14em] text-text-muted">
+              <Shield size={14} className="text-accent-teal" />
+              <span>DECISION STUDIO — PHYSICAL ADAPTATION MEASURES</span>
             </div>
-          ) : (
-            <p className="text-[11px] text-slate-600">No borrowers reachable from the active scenario.</p>
-          )}
+            <EvidenceBadge type="assumption" size="sm" />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            {INTERVENTIONS.map((item) => {
+              const active = interventions.includes(item.id)
+              const target = targetFor(item.id)
+              const isParametric = item.id === 'parametric-cover'
+              const triggered = isParametric && isParametricTriggered(item, state.severity)
+
+              return (
+                <div
+                  key={item.id}
+                  onClick={() => toggleIntervention(item.id)}
+                  className={`rounded-xl border p-4 cursor-pointer transition-all flex flex-col justify-between ${
+                    active
+                      ? 'border-accent-teal/50 bg-accent-teal/[0.08] shadow-sm'
+                      : 'border-border-subtle bg-bg-elevated/70 hover:border-text-muted/40'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-2 mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={`h-4 w-4 rounded flex items-center justify-center border transition-colors ${
+                            active
+                              ? 'border-accent-teal bg-accent-teal text-bg-main'
+                              : 'border-border-subtle bg-bg-card'
+                          }`}
+                        >
+                          {active && <Check size={11} strokeWidth={3} />}
+                        </div>
+                        <span className="font-mono text-[12.5px] font-bold text-text-primary">
+                          {item.label}
+                        </span>
+                      </div>
+                      <span className="font-mono text-[11px] font-bold text-text-muted">
+                        ₹{item.costCr} Cr
+                      </span>
+                    </div>
+
+                    <p className="text-[11.5px] leading-relaxed text-text-secondary pl-6">
+                      {item.description}
+                    </p>
+                  </div>
+
+                  <div className="mt-3.5 pt-2 border-t border-border-subtle/50 pl-6 flex flex-wrap items-center justify-between gap-2 text-[10.5px] font-mono">
+                    <span className="text-accent-teal font-semibold">
+                      {((item.lossReductionShare ?? 0) * 100).toFixed(0)}% loss reduction
+                    </span>
+                    {target && (
+                      <span className="text-text-muted truncate max-w-[200px]">
+                        Target: {target.node.label}
+                      </span>
+                    )}
+                    {isParametric && (
+                      <span className={triggered ? 'text-critical-coral font-bold' : 'text-text-muted'}>
+                        {triggered ? `TRIGGERED: ₹${item.payoutCr} Cr Payout` : `Triggers at ≥${item.triggerSeverityThreshold ?? 0}% severity`}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
 
-        <p className="mt-5 max-w-3xl text-[10.5px] leading-relaxed text-slate-600">
-          The avoided-loss figure is a modeled difference under the selected scenario and
-          intervention assumptions — a potential benefit in the model, not a guaranteed saving. The
-          reduction share currently applies uniformly across affected borrowers; it does not verify
-          that the intervention physically reaches every listed dependency. A real decision would
-          also weigh implementation time, effectiveness uncertainty, and whether the intervention
-          itself remains exposed to the same hazard. The parametric trigger is modeled with real
-          basis risk: it pays the full ₹{INTERVENTIONS.find((i) => i.id === 'parametric-trigger')?.payoutCr} cr the
-          instant severity reaches its threshold, and exactly ₹0 one point below it — try the severity
-          slider across {INTERVENTIONS.find((i) => i.id === 'parametric-trigger')?.triggerSeverityThreshold}/100
-          with it enabled to see the cliff, which is the real tradeoff a buyer accepts for fast,
-          dispute-free payout instead of a slower indemnity claim.
-        </p>
-      </div>
-    </div>
-  )
-}
+        {/* Borrower-by-Borrower Mitigation Breakdown Table */}
+        <div className="rounded-xl border border-border-subtle bg-bg-card p-5 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="font-mono text-[10.5px] font-bold uppercase tracking-[0.14em] text-text-muted">
+              BORROWER-LEVEL MITIGATION APPORTIONMENT
+            </div>
+            <span className="font-mono text-[10.5px] text-text-muted">
+              {companyRows.length} BORROWERS EVALUATED
+            </span>
+          </div>
 
-function SummaryCard({ label, value, color }: { label: string; value: string; color: string }) {
-  return (
-    <div className="rounded border border-line bg-panel-2 p-3.5">
-      <div className="font-mono text-[9px] tracking-wide text-slate-500">{label}</div>
-      <div className="mt-1 font-mono-tnum text-lg font-semibold" style={{ color }}>
-        {value}
+          <div className="overflow-x-auto rounded-lg border border-border-subtle">
+            <table className="w-full text-left font-mono text-[11px]">
+              <thead className="bg-bg-elevated border-b border-border-subtle text-text-muted text-[9.5px] uppercase tracking-wider">
+                <tr>
+                  <th className="p-3">Company</th>
+                  <th className="p-3">Sector</th>
+                  <th className="p-3 text-right">EAD (₹ Cr)</th>
+                  <th className="p-3 text-right">Stressed ECL</th>
+                  <th className="p-3 text-right">Mitigated ECL</th>
+                  <th className="p-3 text-right">Avoided Loss (Δ)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-subtle/50 bg-bg-card">
+                {companyRows.map((r) => (
+                  <tr key={r.company.id} className="hover:bg-bg-elevated/50 transition-colors">
+                    <td className="p-3 font-semibold text-text-primary">{r.company.label}</td>
+                    <td className="p-3 text-text-muted">{r.company.sector}</td>
+                    <td className="p-3 text-right tabular-nums text-text-primary">₹{(r.company.eadCr ?? 0).toFixed(0)}</td>
+                    <td className="p-3 text-right tabular-nums text-critical-coral">₹{r.stressedEl.toFixed(2)}</td>
+                    <td className="p-3 text-right tabular-nums text-accent-teal">₹{r.mitigatedEl.toFixed(2)}</td>
+                    <td className="p-3 text-right tabular-nums text-success-green font-bold">
+                      {r.avoided > 0 ? `-₹${r.avoided.toFixed(2)}` : '₹0.00'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   )

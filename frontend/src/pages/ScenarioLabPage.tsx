@@ -1,13 +1,25 @@
-import { Save, Trash2, Zap } from 'lucide-react'
+import { Save, Trash2, Zap, ArrowRight, RotateCcw } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import ScenarioConsole from '../components/ScenarioConsole'
+import KpiCard from '../components/ui/KpiCard'
+import EvidenceBadge from '../components/ui/EvidenceBadge'
 import { computeImpact, REGION_LABEL, summarizeImpactPlain, useScenarioStore } from '../store/useScenarioStore'
 
 export default function ScenarioLabPage() {
   const state = useScenarioStore()
-  const { savedScenarios, saveCurrentScenario, restoreScenario, deleteScenario, region, hazard, severity, durationMonths } = state
+  const {
+    savedScenarios,
+    saveCurrentScenario,
+    restoreScenario,
+    deleteScenario,
+    region,
+    hazard,
+    severity,
+    durationMonths,
+    applyProfile,
+  } = state
   const [label, setLabel] = useState('')
   const navigate = useNavigate()
 
@@ -15,107 +27,179 @@ export default function ScenarioLabPage() {
   const summary = summarizeImpactPlain(region, hazard, severity, durationMonths, impact)
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-bg-main">
       <PageHeader
         title="SCENARIO LAB"
-        subtitle="CONFIGURE, RUN AND SAVE CLIMATE STRESS SCENARIOS"
-        tag="SHARED STATE — DRIVES THE DIGITAL TWIN, GRAPH AND FINANCIAL ENGINE"
+        subtitle="STRESS-DIAL CALIBRATION & SYSTEMIC TRANSMISSION BENCHMARKS"
+        tag="CROSS-MODULE PARAMETER CONTROLLER"
+        actions={
+          <button
+            onClick={() => applyProfile('Baseline')}
+            className="flex items-center gap-1.5 rounded border border-border-subtle bg-bg-card px-2.5 py-1 font-mono text-[10.5px] text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
+          >
+            <RotateCcw size={11} />
+            <span>RESET TO BASELINE</span>
+          </button>
+        }
       />
 
-      <div className="border-b border-line bg-panel/40">
-        {/* Running from here jumps to the Digital Twin, since this page has
-            no map/graph of its own to visibly animate — otherwise RUN
-            SIMULATION was just a thin progress bar going nowhere. */}
+      {/* Top Controller Ribbon */}
+      <div className="border-b border-border-subtle bg-bg-secondary/70 backdrop-blur-sm">
         <ScenarioConsole onRunSimulation={() => navigate('/twin')} />
       </div>
 
-      <div className="bg-grid p-6">
-        <div className="mb-6 max-w-2xl rounded-lg border border-cyan/30 bg-cyan/[0.06] p-4">
-          <div className="mb-1.5 flex items-center gap-1.5 font-mono text-[9px] tracking-[0.15em] text-cyan">
-            <Zap size={11} /> LIVE — UPDATES AS YOU MOVE ANY DIAL ABOVE
-          </div>
-          <p className="text-[12.5px] leading-relaxed text-slate-200">{summary}</p>
-          <div className="mt-3 grid grid-cols-3 gap-2.5">
-            <Stat label="BASELINE EL" value={`₹${impact.baselineEl.toFixed(1)} cr`} />
-            <Stat label="STRESSED EL" value={`₹${impact.stressedEl.toFixed(1)} cr`} color="#fb3a4a" />
-            <Stat label="BORROWERS REACHED" value={String(impact.companyCount)} />
-          </div>
-          <p className="mt-3 text-[10px] leading-relaxed text-slate-500">
-            This exact configuration also drives the Digital Twin's hazard layer, the Dependency
-            Explorer's propagation, and Portfolio Impact / Mitigation Studio — one scenario, one set of
-            numbers everywhere. Click RUN SIMULATION above to watch it play out on the live 3D map.
-          </p>
+      <div className="p-4 sm:p-6 lg:p-7 space-y-6">
+        {/* KPI Strip */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <KpiCard
+            label="Baseline Expected Loss"
+            value={`₹${impact.baselineEl.toFixed(1)}`}
+            unit="Cr"
+            comparison="Unstressed baseline"
+            comparisonTone="neutral"
+            evidence="modelled"
+          />
+
+          <KpiCard
+            label="Stressed Expected Loss"
+            value={`₹${impact.stressedEl.toFixed(1)}`}
+            unit="Cr"
+            comparison={`+${((impact.stressedEl / (impact.baselineEl || 1) - 1) * 100).toFixed(0)}% increase`}
+            comparisonTone="coral"
+            evidence="modelled"
+          />
+
+          <KpiCard
+            label="Borrowers Reached"
+            value={impact.companyCount}
+            unit="Entities"
+            comparison={`${REGION_LABEL[region]}`}
+            comparisonTone="amber"
+            evidence="sourced"
+          />
+
+          <KpiCard
+            label="Incremental ECL (Δ)"
+            value={`₹${impact.incrementalEl.toFixed(1)}`}
+            unit="Cr"
+            comparison={`${severity}% Severity Dial`}
+            comparisonTone="teal"
+            evidence="assumption"
+          />
         </div>
 
-        <div className="mb-6 max-w-2xl rounded-lg border border-line bg-panel-2 p-4">
-          <div className="mb-1 font-mono text-[10px] tracking-[0.15em] text-slate-500">SAVE THIS CONFIGURATION</div>
-          <div className="flex gap-2">
-            <input
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              placeholder="Name this configuration…"
-              className="flex-1 rounded border border-line bg-panel px-2.5 py-1.5 text-[11px] text-slate-300 placeholder:text-slate-600 focus:border-cyan/50 focus:outline-none"
-            />
+        {/* Live Impact Narrative Card */}
+        <div className="rounded-xl border border-accent-teal/30 bg-bg-card p-5 shadow-sm relative overflow-hidden">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.15em] text-accent-teal">
+              <Zap size={12} />
+              <span>LIVE SYNCHRONIZATION SUMMARY</span>
+            </div>
+            <EvidenceBadge type="modelled" size="sm" />
+          </div>
+
+          <p className="text-[13px] leading-relaxed text-text-primary mt-1 font-sans">
+            {summary}
+          </p>
+
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border-subtle/60 text-[11px] font-mono text-text-muted">
+            <span>
+              Synchronized across Digital Twin, Exposure Graph, and Portfolio Impact engines.
+            </span>
             <button
-              onClick={() => {
-                if (!label.trim()) return
-                saveCurrentScenario(label.trim())
-                setLabel('')
-              }}
-              className="flex items-center gap-1.5 rounded border border-cyan/40 bg-cyan/10 px-3 py-1.5 font-mono text-[10.5px] tracking-wide text-cyan hover:bg-cyan/20"
+              onClick={() => navigate('/twin')}
+              className="flex items-center gap-1 text-accent-teal hover:underline font-semibold cursor-pointer"
             >
-              <Save size={12} /> SAVE
+              <span>View spatial propagation in Digital Twin</span>
+              <ArrowRight size={12} />
             </button>
           </div>
         </div>
 
-        <div className="max-w-2xl">
-          <div className="mb-2 font-mono text-[10px] tracking-[0.15em] text-slate-500">
-            SAVED SCENARIOS ({savedScenarios.length})
+        {/* Save & Saved Scenarios Library */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* Save Configuration Form */}
+          <div className="lg:col-span-5 rounded-xl border border-border-subtle bg-bg-card p-5 shadow-sm space-y-4">
+            <div className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-text-muted">
+              SAVE ACTIVE CONFIGURATION
+            </div>
+
+            <p className="text-[11.5px] leading-relaxed text-text-secondary">
+              Snapshot the current parameter set (Region: {REGION_LABEL[region]}, Hazard: {hazard},
+              Severity: {severity}%, Horizon: {durationMonths}M) for team benchmarking or what-if comparisons.
+            </p>
+
+            <div className="flex gap-2 pt-1">
+              <input
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder="e.g. Q3 Monsoon Severe Stress…"
+                className="flex-1 rounded-lg border border-border-subtle bg-bg-elevated px-3 py-2 font-mono text-[11px] text-text-primary placeholder:text-text-muted focus:border-accent-teal/50 focus:outline-none"
+              />
+              <button
+                disabled={!label.trim()}
+                onClick={() => {
+                  if (!label.trim()) return
+                  saveCurrentScenario(label.trim())
+                  setLabel('')
+                }}
+                className="flex items-center gap-1.5 rounded-lg border border-accent-teal/40 bg-accent-teal/15 px-3.5 py-2 font-mono text-[11px] font-bold text-accent-teal hover:bg-accent-teal/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shrink-0"
+              >
+                <Save size={13} />
+                <span>SAVE</span>
+              </button>
+            </div>
           </div>
-          {savedScenarios.length === 0 ? (
-            <p className="text-[11px] text-slate-600">No saved scenarios yet — configure one above and save it.</p>
-          ) : (
-            <div className="space-y-2">
-              {savedScenarios.map((s) => (
-                <div key={s.id} className="flex items-center justify-between rounded border border-line bg-panel-2 p-3">
-                  <div>
-                    <div className="text-[12px] text-slate-200">{s.label}</div>
-                    <div className="mt-0.5 font-mono text-[10px] text-slate-500">
-                      {REGION_LABEL[s.region]} · {s.hazard} · {s.severity}/100 · {s.durationMonths}mo
-                      {s.interventions.length > 0 && ` · ${s.interventions.length} mitigation(s)`}
+
+          {/* Saved Scenarios Table */}
+          <div className="lg:col-span-7 rounded-xl border border-border-subtle bg-bg-card p-5 shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-text-muted">
+                SAVED BENCHMARKS ({savedScenarios.length})
+              </div>
+              <span className="font-mono text-[10px] text-text-muted">LOCAL REPOSITORY</span>
+            </div>
+
+            {savedScenarios.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border-subtle p-8 text-center font-mono text-[11px] text-text-muted">
+                No saved scenario configurations yet. Set parameters above and click Save.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {savedScenarios.map((s) => (
+                  <div
+                    key={s.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border-subtle bg-bg-elevated p-3 hover:border-text-muted/40 transition-colors"
+                  >
+                    <div>
+                      <div className="font-mono text-[12.5px] font-bold text-text-primary">{s.label}</div>
+                      <div className="font-mono text-[10.5px] text-text-muted mt-0.5">
+                        {REGION_LABEL[s.region]} · <span className="text-accent-teal">{s.hazard}</span> · {s.severity}% SEV · {s.durationMonths}M
+                        {s.interventions.length > 0 && ` · ${s.interventions.length} mitigation(s)`}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => restoreScenario(s.id)}
+                        className="rounded border border-accent-teal/40 bg-accent-teal/10 hover:bg-accent-teal/20 px-3 py-1 font-mono text-[10px] font-semibold text-accent-teal transition-colors cursor-pointer"
+                      >
+                        RESTORE
+                      </button>
+                      <button
+                        onClick={() => deleteScenario(s.id)}
+                        className="rounded border border-border-subtle p-1.5 text-text-muted hover:border-critical-coral/40 hover:text-critical-coral transition-colors cursor-pointer"
+                        title="Delete saved configuration"
+                      >
+                        <Trash2 size={13} />
+                      </button>
                     </div>
                   </div>
-                  <div className="flex gap-1.5">
-                    <button
-                      onClick={() => restoreScenario(s.id)}
-                      className="rounded border border-cyan/40 bg-cyan/10 px-2.5 py-1 font-mono text-[10px] text-cyan hover:bg-cyan/20"
-                    >
-                      RESTORE
-                    </button>
-                    <button
-                      onClick={() => deleteScenario(s.id)}
-                      className="rounded border border-line p-1.5 text-slate-500 hover:border-risk-high/40 hover:text-risk-high"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-    </div>
-  )
-}
-
-function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
-  return (
-    <div className="rounded border border-line bg-panel p-2.5">
-      <div className="font-mono text-[9px] tracking-wide text-slate-500">{label}</div>
-      <div className="mt-0.5 font-mono-tnum text-[15px] font-semibold" style={{ color: color ?? '#e2e8f0' }}>
-        {value}
       </div>
     </div>
   )

@@ -407,35 +407,38 @@ export default function DigitalTwinPage() {
           )}
 
           {districtPopup && (
-            <Popup longitude={districtPopup.lng} latitude={districtPopup.lat} anchor="bottom" closeButton={false} offset={10}>
-              <div className="w-40 font-sans">
-                <div className="font-mono text-[11px] font-semibold text-slate-900">{districtPopup.name}</div>
-                <div className="text-[10px] text-slate-600">Risk {districtPopup.risk}/100</div>
+            <Popup longitude={districtPopup.lng} latitude={districtPopup.lat} anchor="bottom" closeButton={false} offset={12}>
+              <div className="w-48 font-sans p-1">
+                <div className="font-mono text-[11.5px] font-bold text-text-primary">{districtPopup.name}</div>
+                <div className="flex items-center justify-between text-[10.5px] text-text-muted mt-1 pt-1 border-t border-border-subtle/60">
+                  <span>District Risk Index</span>
+                  <span className="font-mono font-semibold text-warning-amber">{districtPopup.risk}/100</span>
+                </div>
               </div>
             </Popup>
           )}
         </GLMap>
 
         {/* Breadcrumb camera control */}
-        <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-1 rounded border border-line bg-panel/85 px-2.5 py-1.5 font-mono text-[10px] tracking-wide backdrop-blur">
+        <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-1.5 rounded-lg border border-border-subtle bg-bg-elevated/90 px-3 py-1.5 font-mono text-[10.5px] tracking-wide shadow-md backdrop-blur-md">
           <button
-            className={`pointer-events-auto ${cameraLevel === 'india' ? 'text-cyan' : 'text-slate-500 hover:text-slate-300'}`}
+            className={`pointer-events-auto transition-colors cursor-pointer ${cameraLevel === 'india' ? 'text-accent-teal font-semibold' : 'text-text-muted hover:text-text-primary'}`}
             onClick={() => flyTo(CAMERA_PRESETS.india, 'india')}
           >
             INDIA
           </button>
-          <ChevronRight size={11} className="text-slate-700" />
+          <ChevronRight size={12} className="text-border-subtle" />
           <button
-            className={`pointer-events-auto ${cameraLevel === 'region' ? 'text-cyan' : 'text-slate-500 hover:text-slate-300'}`}
+            className={`pointer-events-auto transition-colors cursor-pointer ${cameraLevel === 'region' ? 'text-accent-teal font-semibold' : 'text-text-muted hover:text-text-primary'}`}
             onClick={() => flyTo(CAMERA_PRESETS[region], 'region')}
           >
             {CAMERA_PRESETS[region].label.toUpperCase()}
           </button>
           {region === 'HP' && (
             <>
-              <ChevronRight size={11} className="text-slate-700" />
+              <ChevronRight size={12} className="text-border-subtle" />
               <button
-                className={`pointer-events-auto ${cameraLevel === 'valley' ? 'text-cyan' : 'text-slate-500 hover:text-slate-300'}`}
+                className={`pointer-events-auto transition-colors cursor-pointer ${cameraLevel === 'valley' ? 'text-accent-teal font-semibold' : 'text-text-muted hover:text-text-primary'}`}
                 onClick={() => flyTo(CAMERA_PRESETS.valley, 'valley')}
               >
                 KULLU–MANALI VALLEY
@@ -444,66 +447,91 @@ export default function DigitalTwinPage() {
           )}
         </div>
 
-        {/* Layer toggles */}
-        <div className="pointer-events-none absolute right-3 top-3 flex flex-col items-end gap-1.5">
-          <button
-            onClick={() => {
-              const next = styleMode === 'satellite' ? 'institutional' : 'satellite'
-              setStyleMode(next)
-              if (next === 'satellite') {
-                setTimeout(() => {
-                  const map = mapRef.current?.getMap()
-                  if (map && typeof map.setSky === 'function') map.setSky(SKY_PAINT)
-                }, 300)
-              }
-            }}
-            className="pointer-events-auto flex items-center gap-1.5 rounded border border-line bg-panel/85 px-2.5 py-1.5 font-mono text-[9.5px] tracking-wide text-slate-400 backdrop-blur hover:text-slate-200"
-          >
-            <Satellite size={11} />
-            {styleMode === 'satellite' ? 'CINEMATIC TERRAIN' : 'INSTITUTIONAL VIEW'}
-          </button>
-          <button
-            onClick={() => setShowDistricts((v) => !v)}
-            className={`pointer-events-auto flex items-center gap-1.5 rounded border px-2.5 py-1.5 font-mono text-[9.5px] tracking-wide backdrop-blur ${
-              showDistricts ? 'border-cyan/40 bg-cyan/10 text-cyan' : 'border-line bg-panel/85 text-slate-400'
-            }`}
-          >
-            <Layers size={11} /> DISTRICT RISK
-          </button>
-          <button
-            onClick={() => setShowOsmRoads((v) => !v)}
-            className={`pointer-events-auto flex items-center gap-1.5 rounded border px-2.5 py-1.5 font-mono text-[9.5px] tracking-wide backdrop-blur ${
-              showOsmRoads ? 'border-cyan/40 bg-cyan/10 text-cyan' : 'border-line bg-panel/85 text-slate-400'
-            }`}
-          >
-            <Layers size={11} /> REAL ROAD DATA (OSM)
-          </button>
-          {historicalComparison && (
-            <button
-              onClick={() => setShowHistorical(true)}
-              className="pointer-events-auto flex items-center gap-1.5 rounded border border-amber-500/30 bg-panel/85 px-2.5 py-1.5 font-mono text-[9.5px] tracking-wide text-amber-400 backdrop-blur hover:bg-amber-500/10"
-            >
-              <Satellite size={11} /> BEFORE / AFTER (2018)
-            </button>
-          )}
+        {/* Floating Layer Controls Toolbar */}
+        <div className="pointer-events-none absolute right-3 top-3 flex flex-col items-end gap-1.5 max-w-xs">
+          <div className="pointer-events-auto flex flex-col gap-1.5 p-1.5 rounded-lg border border-border-subtle bg-bg-elevated/90 shadow-xl backdrop-blur-md">
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => {
+                  const next = styleMode === 'satellite' ? 'institutional' : 'satellite'
+                  setStyleMode(next)
+                  if (next === 'satellite') {
+                    setTimeout(() => {
+                      const map = mapRef.current?.getMap()
+                      if (map && typeof map.setSky === 'function') map.setSky(SKY_PAINT)
+                    }, 300)
+                  }
+                }}
+                className={`flex-1 flex items-center justify-center gap-1.5 rounded px-2.5 py-1.5 font-mono text-[10px] tracking-wide transition-colors cursor-pointer ${
+                  styleMode === 'satellite'
+                    ? 'border border-accent-teal/40 bg-accent-teal/15 text-accent-teal font-semibold'
+                    : 'border border-border-subtle bg-bg-card text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                <Satellite size={11} />
+                <span>{styleMode === 'satellite' ? 'CINEMATIC 3D' : 'INSTITUTIONAL'}</span>
+              </button>
+
+              <button
+                onClick={() => setShowDistricts((v) => !v)}
+                className={`flex items-center gap-1 rounded px-2 py-1.5 font-mono text-[10px] tracking-wide transition-colors cursor-pointer ${
+                  showDistricts
+                    ? 'border border-accent-teal/40 bg-accent-teal/15 text-accent-teal font-semibold'
+                    : 'border border-border-subtle bg-bg-card text-text-muted hover:text-text-secondary'
+                }`}
+                title="Toggle District Hazard Boundaries"
+              >
+                <Layers size={11} />
+                <span>DISTRICTS</span>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setShowOsmRoads((v) => !v)}
+                className={`flex-1 flex items-center justify-center gap-1.5 rounded px-2.5 py-1 font-mono text-[10px] tracking-wide transition-colors cursor-pointer ${
+                  showOsmRoads
+                    ? 'border border-accent-teal/40 bg-accent-teal/15 text-accent-teal font-semibold'
+                    : 'border border-border-subtle bg-bg-card text-text-muted hover:text-text-secondary'
+                }`}
+              >
+                <Layers size={11} />
+                <span>OSM ROADS</span>
+              </button>
+
+              {historicalComparison && (
+                <button
+                  onClick={() => setShowHistorical(true)}
+                  className="flex items-center gap-1 rounded border border-warning-amber/40 bg-warning-amber/10 px-2 py-1 font-mono text-[10px] tracking-wide text-warning-amber hover:bg-warning-amber/20 transition-colors cursor-pointer"
+                >
+                  <Satellite size={11} />
+                  <span>2018 DISASTER</span>
+                </button>
+              )}
+            </div>
+          </div>
+
           {region === 'HP' && (
             <div
-              className={`pointer-events-none flex items-center gap-1.5 rounded border px-2.5 py-1.5 font-mono text-[9px] tracking-wide backdrop-blur ${
+              className={`pointer-events-none flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-mono text-[9.5px] tracking-wide shadow-md backdrop-blur-md ${
                 elevationStatus === 'ready'
-                  ? 'border-cyan/30 bg-panel/85 text-cyan'
+                  ? 'border-accent-teal/30 bg-bg-elevated/90 text-accent-teal'
                   : elevationStatus === 'error'
-                    ? 'border-risk-high/30 bg-panel/85 text-risk-high'
-                    : 'border-line bg-panel/85 text-slate-500'
+                    ? 'border-critical-coral/30 bg-bg-elevated/90 text-critical-coral'
+                    : 'border-border-subtle bg-bg-elevated/90 text-text-muted'
               }`}
             >
               <Waves size={11} />
-              {elevationStatus === 'ready'
-                ? `DEM FLOOD MODEL · +${computedFlood?.properties?.floodRiseM ?? 0}m`
-                : elevationStatus === 'error'
-                  ? 'DEM UNAVAILABLE — ILLUSTRATIVE EXTENT'
-                  : 'LOADING ELEVATION DATA…'}
+              <span>
+                {elevationStatus === 'ready'
+                  ? `DEM FLOOD MODEL · +${computedFlood?.properties?.floodRiseM ?? 0}m`
+                  : elevationStatus === 'error'
+                    ? 'DEM UNAVAILABLE · EXTENT ESTIMATE'
+                    : 'CALCULATING ELEVATION…'}
+              </span>
             </div>
           )}
+
           {activeHazardNode?.coords && (
             <CurrentConditionsBadge lat={activeHazardNode.coords[1]} lng={activeHazardNode.coords[0]} />
           )}
@@ -513,11 +541,12 @@ export default function DigitalTwinPage() {
         </div>
 
         {/* Legend */}
-        <div className="pointer-events-none absolute bottom-3 left-3 rounded border border-line bg-panel/85 px-3 py-2 backdrop-blur">
-          <div className="flex items-center gap-3 text-[9.5px]">
+        <div className="pointer-events-none absolute bottom-3 left-3 rounded-lg border border-border-subtle bg-bg-elevated/90 px-3 py-2 shadow-lg backdrop-blur-md">
+          <div className="flex flex-wrap items-center gap-3 text-[10px] font-mono">
             {Object.entries(KIND_META).map(([kind, meta]) => (
-              <span key={kind} className="flex items-center gap-1 text-slate-400">
-                <span className="h-2 w-2 rounded-full" style={{ background: meta.color }} /> {meta.label}
+              <span key={kind} className="flex items-center gap-1.5 text-text-secondary">
+                <span className="h-2 w-2 rounded-full" style={{ background: meta.color }} />
+                <span>{meta.label}</span>
               </span>
             ))}
           </div>

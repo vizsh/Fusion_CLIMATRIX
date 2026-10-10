@@ -3,8 +3,8 @@ import { useState } from 'react'
 import LiveNewsPanel from '../components/LiveNewsPanel'
 import LiveWeatherPanel from '../components/LiveWeatherPanel'
 import PageHeader from '../components/PageHeader'
+import EvidenceBadge from '../components/ui/EvidenceBadge'
 import { EVIDENCE_META, type EvidenceClass } from '../lib/evidence'
-import { INTERVENTIONS } from '../lib/interventions'
 import { computeImpact, REGION_LABEL, useScenarioStore } from '../store/useScenarioStore'
 
 interface EvidenceItem {
@@ -37,7 +37,7 @@ const EVIDENCE_ITEMS: EvidenceItem[] = [
   {
     label: 'Flood extent ribbon on the Digital Twin (Himachal Pradesh)',
     cls: 'modelled',
-    detail: 'Computed from real elevation data (the same free Terrarium DEM tiles used for 3D terrain): the water level is set to the valley-floor elevation plus a severity-scaled rise, then grown outward from the river/road corridor until the real terrain exceeds that level. This is a disclosed geometric approximation, not a calibrated hydrological or hydraulic flood simulation — it has no knowledge of river discharge, soil saturation, drainage or flood defenses.',
+    detail: 'Computed from real elevation data (free Terrarium DEM tiles): water level is set to valley-floor elevation plus severity rise, then grown outward until terrain exceeds level. Disclosed geometric approximation, not calibrated hydraulic simulation.',
   },
   {
     label: 'Hazard → infrastructure edges in the dependency graph',
@@ -52,12 +52,12 @@ const EVIDENCE_ITEMS: EvidenceItem[] = [
   {
     label: 'Stressed PD/LGD, expected credit loss (EAD × PD × LGD)',
     cls: 'modelled',
-    detail: 'Computed live from the scenario dials using a transparent, disclosed formula — see Portfolio Impact for the full breakdown.',
+    detail: 'Computed live from scenario dials using transparent, disclosed formula — see Portfolio Impact for the full breakdown.',
   },
   {
     label: 'Sector vulnerability multipliers and sensitivity band (±15% severity)',
     cls: 'assumption',
-    detail: "A disclosed sector-sensitivity table (Tourism and Agriculture stress harder than IT/BPO or Pharmaceuticals under the identical scenario) and a severity sensitivity re-run — not an empirically calibrated result, and not a Monte Carlo confidence interval.",
+    detail: 'A disclosed sector-sensitivity table (Tourism/Agri stress harder than IT/Pharma) and severity sensitivity re-run — not an empirical calibration or Monte Carlo confidence interval.',
   },
   {
     label: 'Hidden concentration risk / institution concentration rankings',
@@ -77,12 +77,12 @@ const EVIDENCE_ITEMS: EvidenceItem[] = [
   {
     label: 'Insurance protection gap, claim estimates, insurer loss ratios',
     cls: 'assumption',
-    detail: 'Sum insured, premium rate and deductible are disclosed illustrative figures on a deliberately incomplete subset of companies (not every borrower carries a policy, by design — the gap itself is the finding). Claim estimates use the same severity-scaled disruption-fraction mechanic as the equity revenue-at-risk calculation, not a calibrated catastrophe or actuarial model. Insurance-adjusted LGD in Company Investigation and Dependency Explorer follows directly from this estimate.',
+    detail: 'Sum insured, premium rate and deductible are disclosed illustrative figures on an incomplete subset of companies. Claim estimates use severity-scaled disruption fraction mechanic.',
   },
   {
     label: 'Company names, sectors, EAD, baseline PD/LGD, bank/supplier relationships',
     cls: 'synthetic',
-    detail: 'Entirely fabricated for this demonstration. No real Indian borrower, bank or supplier data is used anywhere in this prototype.',
+    detail: 'Fabricated for this prototype demonstration. No real Indian borrower, bank or supplier private disclosure is compromised.',
   },
 ]
 
@@ -103,124 +103,153 @@ export default function EvidenceReportsPage() {
     })
   }
 
-  function toggleExpand(i: number) {
+  function toggleExpand(idx: number) {
     setExpanded((prev) => {
       const next = new Set(prev)
-      if (next.has(i)) next.delete(i)
-      else next.add(i)
+      if (next.has(idx)) next.delete(idx)
+      else next.add(idx)
       return next
     })
   }
 
-  function exportReport() {
-    const activeInterventions = INTERVENTIONS.filter((i) => state.interventions.includes(i.id))
+  function downloadReport() {
     const lines = [
-      'CLIMATRIX INDIA — SCENARIO REPORT',
+      '# CLIMATRIX INDIA — SCENARIO AUDIT & DISCLOSURE REPORT',
       `Generated: ${new Date().toISOString()}`,
-      '',
-      '— SCENARIO CONFIGURATION —',
       `Region: ${REGION_LABEL[state.region]}`,
       `Hazard: ${state.hazard}`,
-      `Severity: ${state.severity}/100 (user-defined stress dial)`,
-      `Disruption horizon: ${state.durationMonths} months`,
-      `Supplier substitutability: ${state.substitutability}`,
-      `Interventions active: ${activeInterventions.length ? activeInterventions.map((i) => i.label).join(', ') : 'none'}`,
+      `Severity: ${state.severity}/100`,
+      `Horizon: ${state.durationMonths} months`,
+      `Substitutability: ${state.substitutability}`,
       '',
-      '— FINANCIAL TRANSMISSION (modelled) —',
-      `Reachable portfolio EAD: ₹${impact.eadCr.toFixed(1)} cr across ${impact.companyCount} borrower(s)`,
-      `Baseline PD / LGD: ${(impact.baselinePd * 100).toFixed(2)}% / ${(impact.baselineLgd * 100).toFixed(1)}%`,
-      `Stressed PD / LGD: ${(impact.stressedPd * 100).toFixed(2)}% / ${(impact.stressedLgd * 100).toFixed(1)}%`,
-      `Baseline expected loss: ₹${impact.baselineEl.toFixed(2)} cr`,
-      `Stressed expected loss: ₹${impact.stressedEl.toFixed(2)} cr (sensitivity band ₹${impact.stressedElLow.toFixed(2)}–₹${impact.stressedElHigh.toFixed(2)} cr at severity ±15%)`,
-      `Incremental ECL: ₹${impact.incrementalEl.toFixed(2)} cr`,
-      `Mitigated expected loss: ₹${impact.mitigatedEl.toFixed(2)} cr`,
-      `Modeled avoided loss: ₹${impact.avoidedEl.toFixed(2)} cr (intervention cost ₹${impact.interventionCostCr.toFixed(1)} cr)`,
+      '## Financial Transmission Summary',
+      `Reachable EAD: Rs ${impact.eadCr.toFixed(0)} cr`,
+      `Baseline EL: Rs ${impact.baselineEl.toFixed(2)} cr`,
+      `Stressed EL: Rs ${impact.stressedEl.toFixed(2)} cr`,
+      `Incremental ECL: Rs ${impact.incrementalEl.toFixed(2)} cr`,
+      `Mitigated EL: Rs ${impact.mitigatedEl.toFixed(2)} cr`,
+      `Interventions: ${state.interventions.length ? state.interventions.join(', ') : 'None'}`,
       '',
-      '— EVIDENCE CLASSIFICATION —',
-      ...EVIDENCE_ITEMS.map((e) => `[${EVIDENCE_META[e.cls].label.toUpperCase()}] ${e.label}`),
-      '',
-      'This report is generated from a prototype. Company, loan-exposure and relationship data',
-      'are synthetic and must not be treated as real borrower, bank or portfolio records.',
+      '## Provenance & Methodology Audit',
+      ...EVIDENCE_ITEMS.map((item) => `[${item.cls.toUpperCase()}] ${item.label}\n  -> ${item.detail}\n`),
     ]
-    const blob = new Blob([lines.join('\n')], { type: 'text/plain' })
+    const blob = new Blob([lines.join('\n')], { type: 'text/markdown' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `climatrix-scenario-${state.region}-${Date.now()}.txt`
+    a.download = `climatrix-audit-${state.region.toLowerCase()}-${Date.now()}.md`
     a.click()
     URL.revokeObjectURL(url)
   }
 
+  const filteredItems = EVIDENCE_ITEMS.filter((item) => activeFilters.has(item.cls))
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-bg-main">
       <PageHeader
         title="EVIDENCE & REPORTS"
-        subtitle="EVERY MAJOR RESULT, AUDITABLE"
-        tag="SOURCED · MODELLED · ASSUMPTION · SYNTHETIC"
+        subtitle="DATA PROVENANCE, METHODOLOGY AUDIT & REGULATORY COMPLIANCE"
+        tag="FOUR-TIER DISCLOSURE VOCABULARY"
+        actions={
+          <button
+            onClick={downloadReport}
+            className="flex items-center gap-1.5 rounded-lg border border-accent-teal/40 bg-accent-teal/15 hover:bg-accent-teal/25 px-3 py-1 font-mono text-[11px] font-bold text-accent-teal transition-colors cursor-pointer"
+          >
+            <Download size={13} />
+            <span>EXPORT AUDIT REPORT</span>
+          </button>
+        }
       />
 
-      <div className="bg-grid p-6">
-        <div className="mb-6 grid max-w-5xl grid-cols-1 gap-4 lg:grid-cols-2">
-          <LiveWeatherPanel />
-          <LiveNewsPanel />
-        </div>
+      <div className="p-4 sm:p-6 lg:p-7 space-y-6">
+        {/* Top Summary Banner */}
+        <div className="rounded-xl border border-border-subtle bg-bg-card p-5 shadow-sm space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="font-mono text-[10.5px] font-bold uppercase tracking-[0.14em] text-text-muted">
+              PROVENANCE CLASSIFICATION STANDARD
+            </span>
+            <span className="font-mono text-[10px] text-text-muted">
+              FILTER BY EVIDENCE TIER
+            </span>
+          </div>
 
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-2 pt-1">
             {(Object.keys(EVIDENCE_META) as EvidenceClass[]).map((cls) => {
-              const meta = EVIDENCE_META[cls]
               const active = activeFilters.has(cls)
               return (
                 <button
                   key={cls}
                   onClick={() => toggleFilter(cls)}
-                  className="rounded border px-2.5 py-1 font-mono text-[10px] tracking-wide transition-colors"
-                  style={{
-                    borderColor: active ? meta.color : '#1c2430',
-                    color: active ? meta.color : '#64748b',
-                    background: active ? `${meta.color}14` : 'transparent',
-                  }}
+                  className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 font-mono text-[11px] transition-all cursor-pointer ${
+                    active
+                      ? 'border-border-subtle bg-bg-elevated'
+                      : 'border-border-subtle/50 bg-bg-card opacity-40 hover:opacity-75'
+                  }`}
                 >
-                  {meta.label.toUpperCase()}
+                  <EvidenceBadge type={cls} size="sm" showTooltip={false} />
+                  <span className="text-[10px] text-text-muted">
+                    {EVIDENCE_ITEMS.filter((i) => i.cls === cls).length} Items
+                  </span>
                 </button>
               )
             })}
           </div>
-          <button
-            onClick={exportReport}
-            className="flex items-center gap-1.5 rounded border border-cyan/40 bg-cyan/10 px-3 py-1.5 font-mono text-[10.5px] tracking-wide text-cyan hover:bg-cyan/20"
-          >
-            <Download size={12} /> EXPORT SCENARIO REPORT
-          </button>
         </div>
 
-        <div className="max-w-3xl space-y-2">
-          {EVIDENCE_ITEMS.filter((e) => activeFilters.has(e.cls)).map((e, i) => {
-            const meta = EVIDENCE_META[e.cls]
-            const isOpen = expanded.has(i)
-            return (
-              <div key={e.label} className="rounded-lg border border-line bg-panel-2">
-                <button onClick={() => toggleExpand(i)} className="flex w-full items-center justify-between gap-3 p-3 text-left">
-                  <div className="flex items-center gap-2.5">
-                    <span
-                      className="shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px]"
-                      style={{ borderColor: meta.color, color: meta.color }}
-                    >
-                      {meta.label.toUpperCase()}
-                    </span>
-                    <span className="text-[12px] text-slate-300">{e.label}</span>
+        {/* Evidence Items List */}
+        <div className="rounded-xl border border-border-subtle bg-bg-card p-5 shadow-sm space-y-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-mono text-[10.5px] font-bold uppercase tracking-[0.14em] text-text-muted">
+              MODEL INPUT AUDIT & FIELD PROVENANCE ({filteredItems.length})
+            </span>
+            <span className="font-mono text-[10px] text-text-muted">
+              CLICK ITEM TO INSPECT METHODOLOGY
+            </span>
+          </div>
+
+          <div className="space-y-2">
+            {filteredItems.map((item, idx) => {
+              const isExpanded = expanded.has(idx)
+              return (
+                <div
+                  key={idx}
+                  onClick={() => toggleExpand(idx)}
+                  className="rounded-lg border border-border-subtle bg-bg-elevated p-3 cursor-pointer hover:border-text-muted/40 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-2.5 min-w-0">
+                      <EvidenceBadge type={item.cls} size="sm" />
+                      <span className="font-mono text-[11.5px] font-semibold text-text-primary leading-snug">
+                        {item.label}
+                      </span>
+                    </div>
+                    <ChevronDown
+                      size={14}
+                      className={`text-text-muted shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                    />
                   </div>
-                  <ChevronDown size={14} className={`shrink-0 text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-                </button>
-                {isOpen && (
-                  <div className="border-t border-line-soft px-3 pb-3 pt-2 text-[11.5px] leading-relaxed text-slate-500">
-                    <div className="mb-1.5 italic text-slate-600">{meta.desc}</div>
-                    {e.detail}
-                  </div>
-                )}
-              </div>
-            )
-          })}
+
+                  {isExpanded && (
+                    <div className="mt-3 pt-2.5 border-t border-border-subtle/60 pl-2">
+                      <p className="text-[12px] leading-relaxed text-text-secondary font-sans">
+                        {item.detail}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Live Weather & News Feeds */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="rounded-xl border border-border-subtle bg-bg-card p-5 shadow-sm">
+            <LiveWeatherPanel />
+          </div>
+          <div className="rounded-xl border border-border-subtle bg-bg-card p-5 shadow-sm">
+            <LiveNewsPanel />
+          </div>
         </div>
       </div>
     </div>

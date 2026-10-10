@@ -1,0 +1,44 @@
+{
+  "meta": {
+    "note": "SYNTHETIC lending exposures. Every record on this file is invented for the prototype.",
+    "warning": "These are NOT real bank exposures. No Indian bank's actual borrower book, EAD, PD or LGD is represented here. Any figure derived from this file must be labelled SYNTHETIC in the interface.",
+    "ead_cr": "Exposure at default, INR crore.",
+    "pd_base": "Baseline probability of default over the stated credit-risk horizon (12 months).",
+    "lgd_base": "Baseline loss given default, fraction.",
+    "credit_risk_horizon_months": 12,
+    "horizon_note": "The credit-risk horizon is 12 months and is deliberately distinct from the operational disruption horizon set by the scenario slider.",
+    "collateral_hazard_exposed": "True where the pledged collateral sits at the borrower's own hazard-exposed location, so collateral value degrades with the hazard.",
+    "evidence": "synthetic"
+  },
+  "exposures": [
+    { "id": "EXP-001", "lender": "sbin", "borrower": "hp-baddi-pharma", "ead_cr": 420, "pd_base": 0.021, "lgd_base": 0.38, "collateral_type": "Plant & machinery", "collateral_hazard_exposed": true },
+    { "id": "EXP-002", "lender": "sbin", "borrower": "hp-nalagarh-api", "ead_cr": 265, "pd_base": 0.024, "lgd_base": 0.4, "collateral_type": "Plant & machinery", "collateral_hazard_exposed": true },
+    { "id": "EXP-003", "lender": "icicibank", "borrower": "hp-solan-packaging", "ead_cr": 95, "pd_base": 0.028, "lgd_base": 0.42, "collateral_type": "Industrial property", "collateral_hazard_exposed": true },
+    { "id": "EXP-004", "lender": "hdfcbank", "borrower": "hp-parwanoo-comp", "ead_cr": 160, "pd_base": 0.025, "lgd_base": 0.4, "collateral_type": "Plant & machinery", "collateral_hazard_exposed": true },
+    { "id": "EXP-005", "lender": "axisbank", "borrower": "hp-kalaamb-auto", "ead_cr": 130, "pd_base": 0.027, "lgd_base": 0.41, "collateral_type": "Plant & machinery", "collateral_hazard_exposed": true },
+    { "id": "EXP-006", "lender": "sbin", "borrower": "hp-mandi-hydro", "ead_cr": 540, "pd_base": 0.019, "lgd_base": 0.33, "collateral_type": "Project assets", "collateral_hazard_exposed": true },
+    { "id": "EXP-007", "lender": "sbin", "borrower": "hp-kullu-horti", "ead_cr": 85, "pd_base": 0.045, "lgd_base": 0.5, "collateral_type": "Agricultural assets", "collateral_hazard_exposed": true },
+    { "id": "EXP-008", "lender": "bajfinance", "borrower": "hp-manali-tourism", "ead_cr": 110, "pd_base": 0.052, "lgd_base": 0.55, "collateral_type": "Commercial property", "collateral_hazard_exposed": true },
+    { "id": "EXP-009", "lender": "icicibank", "borrower": "hp-shimla-hosp", "ead_cr": 145, "pd_base": 0.048, "lgd_base": 0.52, "collateral_type": "Commercial property", "collateral_hazard_exposed": true },
+    { "id": "EXP-010", "lender": "kotakbank", "borrower": "hp-paonta-chem", "ead_cr": 120, "pd_base": 0.026, "lgd_base": 0.4, "collateral_type": "Plant & machinery", "collateral_hazard_exposed": true },
+    { "id": "EXP-011", "lender": "axisbank", "borrower": "hp-una-steel", "ead_cr": 105, "pd_base": 0.031, "lgd_base": 0.44, "collateral_type": "Plant & machinery", "collateral_hazard_exposed": true },
+    { "id": "EXP-012", "lender": "hdfcbank", "borrower": "hp-baddi-coldchain", "ead_cr": 68, "pd_base": 0.029, "lgd_base": 0.43, "collateral_type": "Warehousing assets", "collateral_hazard_exposed": true },
+    { "id": "EXP-013", "lender": "sbin", "borrower": "hp-sundernagar-tx", "ead_cr": 92, "pd_base": 0.027, "lgd_base": 0.41, "collateral_type": "Plant & machinery", "collateral_hazard_exposed": true },
+    { "id": "EXP-014", "lender": "icicibank", "borrower": "hp-kangra-agro", "ead_cr": 55, "pd_base": 0.044, "lgd_base": 0.49, "collateral_type": "Agricultural assets", "collateral_hazard_exposed": true },
+    { "id": "EXP-015", "lender": "sbin", "borrower": "hp-bilaspur-cement", "ead_cr": 115, "pd_base": 0.03, "lgd_base": 0.42, "collateral_type": "Plant & machinery", "collateral_hazard_exposed": true },
+
+    { "id": "EXP-016", "lender": "sbin", "borrower": "sunpharma", "ead_cr": 1850, "pd_base": 0.009, "lgd_base": 0.3, "collateral_type": "Corporate facility", "collateral_hazard_exposed": false },
+    { "id": "EXP-017", "lender": "icicibank", "borrower": "cipla", "ead_cr": 1240, "pd_base": 0.01, "lgd_base": 0.31, "collateral_type": "Corporate facility", "collateral_hazard_exposed": false },
+    { "id": "EXP-018", "lender": "axisbank", "borrower": "lupin", "ead_cr": 980, "pd_base": 0.012, "lgd_base": 0.33, "collateral_type": "Corporate facility", "collateral_hazard_exposed": false },
+    { "id": "EXP-019", "lender": "hdfcbank", "borrower": "torrentpharma", "ead_cr": 720, "pd_base": 0.011, "lgd_base": 0.32, "collateral_type": "Corporate facility", "collateral_hazard_exposed": false },
+    { "id": "EXP-020", "lender": "sbin", "borrower": "tatamotors", "ead_cr": 2400, "pd_base": 0.013, "lgd_base": 0.32, "collateral_type": "Corporate facility", "collateral_hazard_exposed": false },
+    { "id": "EXP-021", "lender": "icicibank", "borrower": "maruti", "ead_cr": 1600, "pd_base": 0.008, "lgd_base": 0.29, "collateral_type": "Corporate facility", "collateral_hazard_exposed": false },
+    { "id": "EXP-022", "lender": "kotakbank", "borrower": "boschltd", "ead_cr": 640, "pd_base": 0.009, "lgd_base": 0.3, "collateral_type": "Corporate facility", "collateral_hazard_exposed": false },
+    { "id": "EXP-023", "lender": "axisbank", "borrower": "motherson", "ead_cr": 1100, "pd_base": 0.014, "lgd_base": 0.34, "collateral_type": "Corporate facility", "collateral_hazard_exposed": false },
+    { "id": "EXP-024", "lender": "sbin", "borrower": "powergrid", "ead_cr": 2100, "pd_base": 0.006, "lgd_base": 0.26, "collateral_type": "Project assets", "collateral_hazard_exposed": false },
+    { "id": "EXP-025", "lender": "hdfcbank", "borrower": "ultratech", "ead_cr": 1350, "pd_base": 0.009, "lgd_base": 0.3, "collateral_type": "Corporate facility", "collateral_hazard_exposed": false },
+    { "id": "EXP-026", "lender": "icicibank", "borrower": "lt", "ead_cr": 2250, "pd_base": 0.008, "lgd_base": 0.28, "collateral_type": "Corporate facility", "collateral_hazard_exposed": false },
+    { "id": "EXP-027", "lender": "sbin", "borrower": "ntpc", "ead_cr": 2800, "pd_base": 0.006, "lgd_base": 0.25, "collateral_type": "Project assets", "collateral_hazard_exposed": false },
+    { "id": "EXP-028", "lender": "axisbank", "borrower": "drreddy", "ead_cr": 890, "pd_base": 0.01, "lgd_base": 0.31, "collateral_type": "Corporate facility", "collateral_hazard_exposed": false }
+  ]
+}

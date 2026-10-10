@@ -1,4 +1,5 @@
 import { HashRouter, Route, Routes } from 'react-router-dom'
+import LandingPage from './landing/LandingPage'
 import AppShell from './layout/AppShell'
 import CommandCentrePage from './pages/CommandCentrePage'
 import CompanyInvestigationPage from './pages/CompanyInvestigationPage'
@@ -18,8 +19,12 @@ export default function App() {
   return (
     <HashRouter>
       <Routes>
+        {/* Landing page — public entry point */}
+        <Route index element={<LandingPage />} />
+
+        {/* App shell wraps all dashboard/tool pages */}
         <Route element={<AppShell />}>
-          <Route index element={<CommandCentrePage />} />
+          <Route path="app" element={<CommandCentrePage />} />
           <Route path="dashboard" element={<PortfolioDashboardPage />} />
           <Route path="twin" element={<DigitalTwinPage />} />
           <Route path="scenario" element={<ScenarioLabPage />} />

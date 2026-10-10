@@ -1,20 +1,67 @@
 @import 'tailwindcss';
 
 @theme {
-  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace;
 
-  --color-base: #05070a;
-  --color-panel: #0b0e14;
-  --color-panel-2: #10141c;
-  --color-line: #1c2430;
-  --color-line-soft: #141a24;
+  /* Institutional Dark Theme Tokens */
+  --color-bg-main: #0B1119;
+  --color-bg-secondary: #101923;
+  --color-bg-card: #141C25;
+  --color-bg-elevated: #182432;
+  --color-border-subtle: #293746;
+  --color-border-line: #1F2A38;
 
-  --color-cyan: #22d3ee;
-  --color-cyan-dim: #0e7490;
-  --color-risk-high: #fb3a4a;
-  --color-risk-med: #f5a524;
-  --color-risk-low: #2dd4a7;
+  --color-text-primary: #F1F5F9;
+  --color-text-secondary: #A9B7C7;
+  --color-text-muted: #78899B;
+
+  --color-accent-teal: #55DCC0;
+  --color-accent-blue: #5B9BDD;
+  --color-warning-amber: #F3B65D;
+  --color-critical-coral: #FF727D;
+  --color-success-green: #48B89D;
+
+  /* Compatibility bindings for existing components */
+  --color-base: #0B1119;
+  --color-panel: #101923;
+  --color-panel-2: #141C25;
+  --color-surface: #141C25;
+  --color-surface-2: #182432;
+  --color-border: #293746;
+  --color-line: #293746;
+  --color-line-soft: #182432;
+
+  --color-cyan: #55DCC0;
+  --color-cyan-dim: #257867;
+  --color-risk-high: #FF727D;
+  --color-risk-med: #F3B65D;
+  --color-risk-low: #48B89D;
+
+  --color-ev-verified: #48B89D;
+  --color-ev-sourced: #5B9BDD;
+  --color-ev-inferred: #F3B65D;
+  --color-ev-assumed: #A78BFA;
+}
+
+:root {
+  --bg-main: #0B1119;
+  --bg-secondary: #101923;
+  --bg-card: #141C25;
+  --bg-elevated: #182432;
+  --border-subtle: #293746;
+  --text-primary: #F1F5F9;
+  --text-secondary: #A9B7C7;
+  --text-muted: #78899B;
+  --accent-teal: #55DCC0;
+  --accent-blue: #5B9BDD;
+  --warning-amber: #F3B65D;
+  --critical-coral: #FF727D;
+  --success-green: #48B89D;
+
+  --color-base: #0B1119;
+  --color-panel: #101923;
+  --color-panel-2: #141C25;
 }
 
 html,
@@ -22,8 +69,8 @@ body,
 #root {
   height: 100%;
   margin: 0;
-  background: var(--color-base);
-  color: #cbd5e1;
+  background-color: #0B1119;
+  color: #F1F5F9;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
@@ -93,4 +140,58 @@ body,
    which live as DOM siblings inside the same maplibre container. */
 .map-dark .maplibregl-canvas {
   filter: invert(1) hue-rotate(180deg) brightness(0.85) saturate(0.35) contrast(0.95);
+}
+
+/* Institutional dark overrides for MapLibre UI overlays */
+.maplibregl-popup-content {
+  background-color: #141C25 !important;
+  color: #F1F5F9 !important;
+  border: 1px solid #293746 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6) !important;
+  padding: 10px 14px !important;
+}
+.maplibregl-popup-tip {
+  border-top-color: #141C25 !important;
+  border-bottom-color: #141C25 !important;
+}
+.maplibregl-ctrl-group {
+  background-color: #141C25 !important;
+  border: 1px solid #293746 !important;
+  border-radius: 6px !important;
+  overflow: hidden !important;
+}
+.maplibregl-ctrl-group button {
+  background-color: transparent !important;
+  border-bottom: 1px solid #293746 !important;
+}
+.maplibregl-ctrl-group button:hover {
+  background-color: #182432 !important;
+}
+
+/* Institutional dark overrides for React Flow */
+.react-flow__controls {
+  background-color: #141C25 !important;
+  border: 1px solid #293746 !important;
+  border-radius: 6px !important;
+  overflow: hidden !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5) !important;
+}
+.react-flow__controls-button {
+  background-color: #141C25 !important;
+  border-bottom: 1px solid #293746 !important;
+  color: #F1F5F9 !important;
+  fill: #F1F5F9 !important;
+}
+.react-flow__controls-button:hover {
+  background-color: #182432 !important;
+}
+.react-flow__controls-button svg {
+  fill: #A9B7C7 !important;
+}
+.react-flow__minimap {
+  background-color: #101923 !important;
+  border: 1px solid #293746 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5) !important;
 }
