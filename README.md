@@ -243,6 +243,15 @@ the "why does this matter" case is made before any dial is touched.
   85 and duration to 9 months" actually moves the live scenario dials
   (every page updates, not just the chat), "guide me to the map" navigates
   and starts the simulation clock, "download a brief" produces the file.
+- **Guided scenario automation** — say "automate a scenario for me" and the
+  Copilot asks one question at a time (region, hazard, severity, duration,
+  substitutability — click a chip or just type), applies every answer to
+  the live dials as it goes, then runs the exact engine every dashboard
+  page uses and reports the outcome itself: stressed loss, sector
+  breakdown, and one-click follow-ups to watch it on the live map, open
+  Portfolio Impact, or check insurance. "cancel" exits cleanly at any step;
+  an unrecognized answer re-asks instead of guessing
+  (`lib/copilot/automation.ts`).
 - **Company and institution lookup by name** — ask about a specific
   borrower or bank/insurer and get its live, scenario-adjusted exposure,
   insurance-adjusted LGD, and dependency path — not a keyword search.

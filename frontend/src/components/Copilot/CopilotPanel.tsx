@@ -17,6 +17,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Check, Link2, Maximize2, Mic, MicOff, Minimize2, Radar, Send, Share2, Volume2, VolumeX, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useScenarioStore } from '../../store/useScenarioStore'
+import { advanceWizard, cancelWizardBlocks, isAutomationTrigger, isWizardCancel, startWizard, type WizardState } from '../../lib/copilot/automation'
 import { copyContextBundle, copyShareableLink, downloadContextBundle } from '../../lib/copilot/contextExport'
 import { downloadBrief, downloadPortfolioBrief, generatePortfolioOverview, generateWhatIf } from '../../lib/copilot/engine'
 import { ollamaStatus, warmUpOllama } from '../../lib/copilot/ollamaClient'
@@ -26,10 +27,10 @@ import { isVoiceInputSupported, isVoiceOutputSupported, speak, speechFromBlocks,
 import { CopilotBlockView } from './CopilotBlocks'
 
 const SUGGESTIONS = [
+  'Automate a scenario for me',
   'Analyse my portfolio and give me the risks',
   'Set severity to 90 and duration to 9 months',
   'Compare Himachal Pradesh and Mumbai',
-  'How is expected credit loss actually calculated?',
 ]
 
 let turnSeq = 0
@@ -53,7 +54,7 @@ export default function CopilotPanel() {
         { kind: 'heading', text: 'CLIMATRIX AI Copilot' },
         {
           kind: 'text',
-          text: "Ask me to analyse your whole portfolio, run a what-if scenario anywhere in the graph, check insurance or compliance, or guide you through the app. I read and operate the same live scenario state as the dashboard — nothing I say will disagree with what's on screen, and I never invent a number.",
+          text: "Ask me to analyse your whole portfolio, run a what-if scenario anywhere in the graph, check insurance or compliance, or guide you through the app. I read and operate the same live scenario state as the dashboard — nothing I say will disagree with what's on screen, and I never invent a number. Say \"automate\" and I'll ask you one question at a time, then build and run the scenario myself.",
         },
       ],
     },
@@ -63,6 +64,11 @@ export default function CopilotPanel() {
   const [listening, setListening] = useState(false)
   const [voiceOut, setVoiceOut] = useState(false) // opt-in, off by default
   const [justCopied, setJustCopied] = useState<'bundle' | 'link' | null>(null)
+  // Guided-automation wizard: when set, send() routes to advanceWizard()
+  // instead of the stateless rule engine, so "automate" can ask follow-up
+  // questions across several turns rather than needing one message to
+  // carry the whole scenario.
+  const [wizard, setWizard] = useState<WizardState | null>(null)
   const stopListenRef = useRef<() => void>(() => {})
   const scrollRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
@@ -98,7 +104,12 @@ export default function CopilotPanel() {
   }
 
   function applyDials(action: CopilotAction) {
+    // setRegion resets hazard to that region's own default, so an explicit
+    // action.hazard (e.g. from the guided scenario builder) must be applied
+    // AFTER the region — otherwise a non-default hazard choice (Cyclone on
+    // Kerala, say) silently reverts the instant the region is set.
     if (action.region) state.setRegion(action.region)
+    if (action.hazard) state.setHazard(action.hazard)
     if (action.severity !== undefined) state.setSeverity(action.severity)
     if (action.durationMonths !== undefined) state.setDuration(action.durationMonths)
     if (action.substitutability) state.setSubstitutability(action.substitutability)
@@ -138,16 +149,41 @@ export default function CopilotPanel() {
     }
   }
 
+  function reply(blocks: Parameters<typeof speechFromBlocks>[0]) {
+    setTurns((prev) => [...prev, { id: nextId(), role: 'assistant', blocks }])
+    if (voiceOut) speak(speechFromBlocks(blocks))
+  }
+
   async function send(raw?: string) {
     const text = (raw ?? input).trim()
     if (!text || thinking) return
     setInput('')
     setTurns((prev) => [...prev, { id: nextId(), role: 'user', text }])
+
+    // Guided automation: mid-wizard, every message answers the current
+    // question instead of going through the general rule engine.
+    if (wizard) {
+      if (isWizardCancel(text)) {
+        setWizard(null)
+        reply(cancelWizardBlocks())
+        return
+      }
+      const result = advanceWizard(wizard, text, state)
+      setWizard(result.wizard)
+      reply(result.blocks)
+      return
+    }
+    if (isAutomationTrigger(text)) {
+      const started = startWizard()
+      setWizard(started.wizard)
+      reply(started.blocks)
+      return
+    }
+
     setThinking(true)
     try {
-      const reply = await respondTo(text, state)
-      setTurns((prev) => [...prev, { id: nextId(), role: 'assistant', blocks: reply.blocks }])
-      if (voiceOut) speak(speechFromBlocks(reply.blocks))
+      const result = await respondTo(text, state)
+      reply(result.blocks)
     } finally {
       setThinking(false)
     }
@@ -260,6 +296,14 @@ export default function CopilotPanel() {
                 >
                   {ollamaReady === null ? 'CHECKING' : ollamaReady ? 'OLLAMA READY' : 'RULES ONLY'}
                 </span>
+                {wizard && (
+                  <span
+                    title={`Guided scenario builder active — step: ${wizard.step}. Answer the question above, or say "cancel" to stop.`}
+                    className="flex items-center gap-1 rounded-full border border-risk-med/40 bg-risk-med/10 px-2 py-0.5 font-mono text-[8.5px] tracking-wide text-risk-med"
+                  >
+                    GUIDED MODE
+                  </span>
+                )}
                 <button
                   onClick={() => setExpanded((v) => !v)}
                   title={expanded ? 'Collapse to the docked panel' : 'Expand — tables and comparisons get a lot more room'}
@@ -339,7 +383,15 @@ export default function CopilotPanel() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 disabled={thinking}
-                placeholder={thinking ? 'Thinking…' : listening ? 'Listening…' : 'Ask about exposure, scenarios, insurance…'}
+                placeholder={
+                  thinking
+                    ? 'Thinking…'
+                    : listening
+                      ? 'Listening…'
+                      : wizard
+                        ? 'Type your answer, or click an option above…'
+                        : 'Ask about exposure, scenarios, insurance…'
+                }
                 className="flex-1 bg-transparent text-[12.5px] text-slate-200 placeholder:text-slate-500 focus:outline-none disabled:opacity-50"
               />
               <button

@@ -174,6 +174,7 @@ page uses (`lib/copilot/answers.ts`).
 | Feature | Implementation | Tag |
 |---|---|---|
 | Natural-language scenario control ("set severity to 85...") | `answerSetScenario` — actually calls the store setters, not just describes | Real action |
+| **Guided scenario automation ("automate a scenario for me")** | `lib/copilot/automation.ts` — a stateful wizard layered on top of the stateless rule engine; asks region → hazard → severity (preset or custom) → duration → substitutability one at a time (click a chip or type free text), then sets every dial, runs `computeImpact`, and reports the outcome with the same stat/table blocks every other answer uses. "cancel" exits without changing anything; an unrecognized answer re-asks instead of guessing | Real action |
 | Company/institution lookup, region comparison, methodology explainer | `answerCompanyLookup`, `answerCompareRegions`, `answerMethodology` | Modeled |
 | What-If multi-scenario + portfolio overview, downloadable briefs | `engine.ts`'s `generateWhatIf`/`generatePortfolioOverview` | Modeled |
 | Reverse stress test, ML anomaly bridge, semantic news search | `answerReverseStressTest`, `answerWeatherAnomaly`, `answerBackendNewsSearch` | Modeled / Sourced |
