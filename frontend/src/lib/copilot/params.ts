@@ -81,7 +81,7 @@ const OUT_OF_SCOPE_DOMAINS: { domain: string; terms: string[] }[] = [
   },
   {
     domain: 'security, terrorism or armed conflict',
-    terms: ['terroris', 'war', 'military conflict', 'armed conflict', 'insurgency', 'cyberattack', 'cyber attack', 'sabotage', 'border conflict'],
+    terms: ['terrorism', 'terrorist', 'terrorists', 'war', 'military conflict', 'armed conflict', 'insurgency', 'cyberattack', 'cyber attack', 'sabotage', 'border conflict'],
   },
   {
     domain: 'pandemic or public-health risk',
@@ -93,37 +93,52 @@ const OUT_OF_SCOPE_DOMAINS: { domain: string; terms: string[] }[] = [
   },
 ]
 
+function escapeRegExpTerm(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** Word-boundary term matching, used by every gazetteer-style detector in
+ * this file (region, unmapped-city, out-of-scope domain) — NOT a bare
+ * substring check. Two real bugs this fixes, both caught live against
+ * real news article text: `.includes('kl')` (Kerala's short alias)
+ * matched inside the ordinary word "quickly", silently misattributing an
+ * unrelated Mumbai heatwave story to Kerala; `.includes('war')` matched
+ * inside "heatwave-warning", misrouting a genuine weather-warning article
+ * into the out-of-scope "security/armed conflict" answer. Short 2-letter
+ * region codes ('hp'/'kl'/'mh') are the worst offenders, but matching
+ * everything the same way is simpler and strictly safer than
+ * special-casing only the short ones. */
+function termMatches(text: string, term: string): boolean {
+  return new RegExp(`\\b${escapeRegExpTerm(term)}\\b`, 'i').test(text)
+}
+
 /** Returns the unmodeled risk domain a question is actually about, or null
  * if it isn't one of these — never a guess, only an explicit keyword match,
  * same discipline as every other detector in this file. */
 export function detectOutOfScopeDomain(text: string): string | null {
-  const lower = text.toLowerCase()
   for (const { domain, terms } of OUT_OF_SCOPE_DOMAINS) {
-    if (terms.some((t) => lower.includes(t))) return domain
+    if (terms.some((t) => termMatches(text, t))) return domain
   }
   return null
 }
 
 export function detectRegion(text: string): Region | null {
-  const lower = text.toLowerCase()
   for (const { region, terms } of REGION_ALIASES) {
-    if (terms.some((t) => lower.includes(t))) return region
+    if (terms.some((t) => termMatches(text, t))) return region
   }
   return null
 }
 
 export function detectUnmappedCity(text: string) {
-  const lower = text.toLowerCase()
-  return UNMAPPED_CITIES.find((c) => c.terms.some((t) => lower.includes(t))) ?? null
+  return UNMAPPED_CITIES.find((c) => c.terms.some((t) => termMatches(text, t))) ?? null
 }
 
 /** Every region named in the text, in first-mention order — used for
  * "compare X and Y" questions, unlike detectRegion's single-best-match. */
 export function detectRegions(text: string): Region[] {
-  const lower = text.toLowerCase()
   const found: Region[] = []
   for (const { region, terms } of REGION_ALIASES) {
-    if (!found.includes(region) && terms.some((t) => lower.includes(t))) found.push(region)
+    if (!found.includes(region) && terms.some((t) => termMatches(text, t))) found.push(region)
   }
   return found
 }

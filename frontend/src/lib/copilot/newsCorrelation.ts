@@ -62,8 +62,20 @@ interface LinkedRegion {
  * substring match only (no fuzzy ratio) — real news prose rarely misspells
  * a company name, and a false fuzzy match here would misattribute a real
  * article to the wrong (synthetic) company, which is worse than missing it. */
+function escapeRegExpTerm(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+/** Word-boundary match, not a bare substring check — a company/institution
+ * full name is long enough that a mid-word collision is unlikely, but the
+ * region check right below this used to run the exact same `.includes()`
+ * pattern that misattributed a real Mumbai heatwave article to Kerala
+ * (see params.ts's termMatches doc comment) — matching every gazetteer
+ * lookup in this feature the same, safer way, not just the one that broke. */
+function termMatches(text: string, term: string): boolean {
+  return new RegExp(`\\b${escapeRegExpTerm(term)}\\b`, 'i').test(text)
+}
+
 function linkEntities(text: string): { companies: LinkedCompany[]; institutions: LinkedInstitution[]; regions: LinkedRegion[] } {
-  const lower = text.toLowerCase()
   const companies: LinkedCompany[] = []
   const institutions: LinkedInstitution[] = []
   const regionsFound = new Set<Region>()
@@ -73,7 +85,7 @@ function linkEntities(text: string): { companies: LinkedCompany[]; institutions:
     if (node.kind !== 'company' && node.kind !== 'bank' && node.kind !== 'govt' && node.kind !== 'insurer') continue
     const label = node.label.toLowerCase()
     if (!label || label.length < 4) continue
-    if (lower.includes(label)) {
+    if (termMatches(text, label)) {
       if (node.kind === 'company') companies.push({ node, matchedOn: node.label })
       else institutions.push({ node, matchedOn: node.label })
     }
@@ -81,7 +93,7 @@ function linkEntities(text: string): { companies: LinkedCompany[]; institutions:
 
   for (const region of Object.keys(REGION_LABEL) as Region[]) {
     const label = REGION_LABEL[region].toLowerCase()
-    if (lower.includes(label) && !regionsFound.has(region)) {
+    if (termMatches(text, label) && !regionsFound.has(region)) {
       regionsFound.add(region)
       regions.push({ region, matchedOn: REGION_LABEL[region] })
     }

@@ -87,6 +87,62 @@ class _ArticleHTMLParser(HTMLParser):
                 deduped.append(p)
         return "\n\n".join(deduped)
 
+    def article_paragraphs(self) -> list[str]:
+        """Same de-duped list as result_text(), before boilerplate
+        trimming — the trimmer below needs the paragraph boundaries,
+        not a pre-joined string."""
+        self._flush_paragraph()
+        deduped: list[str] = []
+        for p in self._paragraphs:
+            if not deduped or deduped[-1] != p:
+                deduped.append(p)
+        return deduped
+
+
+# Markers that reliably start a news site's trailing boilerplate (author
+# bio, "related articles" rail, trending-topics widget, footer nav) on the
+# large Indian news sites this feature is actually aimed at (TOI, Hindu
+# BusinessLine, Economic Times, etc.) — checked case-insensitively, text
+# from the first match onward is dropped. This matters for ACCURACY, not
+# just tidiness: an unrelated "trending topics" link list sitting right
+# next to the real article text would otherwise get entity-linked and
+# hazard-detected right along with it, diluting or corrupting the signal
+# the correlation step reasons over.
+_BOILERPLATE_MARKERS = [
+    "about the author",
+    "you can also check",
+    "tired of too many ads",
+    "stay updated with the latest",
+    "related articles",
+    "also read",
+    "trending topics",
+    "download the toi app",
+    "subscribe to continue reading",
+    "more from this section",
+]
+
+
+def _trim_boilerplate(paragraphs: list[str]) -> list[str]:
+    """Cuts the paragraph list at the first boilerplate marker, then also
+    drops a trailing run of very short, link-like fragments (a common
+    "related articles" list shape even on sites that don't use any of the
+    marker phrases above)."""
+    cut_at = len(paragraphs)
+    for i, p in enumerate(paragraphs):
+        low = p.lower()
+        if any(marker in low for marker in _BOILERPLATE_MARKERS):
+            cut_at = i
+            break
+    kept = paragraphs[:cut_at]
+
+    # Trim a trailing run of short (<90 char) fragments — typical of a
+    # headline-link list with no marker phrase. Keep at least the first
+    # 2 paragraphs regardless (a genuinely short article shouldn't be
+    # trimmed to nothing).
+    while len(kept) > 2 and len(kept[-1]) < 90:
+        kept.pop()
+    return kept
+
 
 class ArticleExtractorConnector(DataConnector):
     name = "Article Extractor (server-side fetch)"
@@ -127,7 +183,8 @@ class ArticleExtractorConnector(DataConnector):
             return ConnectorResult(ConnectorStatus.ERROR, None, f"Could not parse that page's HTML: {e}")
 
         title = parser.og_title or parser.title or url
-        text = parser.result_text()
+        trimmed_paragraphs = _trim_boilerplate(parser.article_paragraphs())
+        text = "\n\n".join(trimmed_paragraphs)
         if len(text) < 80:
             return ConnectorResult(
                 ConnectorStatus.ERROR,

@@ -26,18 +26,38 @@ export interface FreeTextParseResult {
   notes: string[]
 }
 
-const HAZARD_TERMS: { hazard: Hazard; terms: string[] }[] = [
-  { hazard: 'Flood', terms: ['flood', 'monsoon', 'deluge', 'inundat'] },
-  { hazard: 'Drought', terms: ['drought', 'dry spell', 'water scarcity', 'water stress'] },
-  { hazard: 'Cyclone', terms: ['cyclone', 'hurricane', 'typhoon', 'storm surge'] },
-  { hazard: 'Heatwave', terms: ['heatwave', 'heat wave', 'extreme heat', 'scorching'] },
-  { hazard: 'Landslide', terms: ['landslide', 'mudslide', 'slope failure', 'rockslide'] },
+function escapeRegExpTerm(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+function termMatches(text: string, term: string): boolean {
+  return new RegExp(`\\b${escapeRegExpTerm(term)}\\b`, 'i').test(text)
+}
+
+// `strong` = the hazard's own name (or an unambiguous synonym) — if this
+// is present anywhere in the text, that hazard wins outright. `weak` =
+// a contextually-associated word that's suggestive but genuinely
+// ambiguous on its own. "monsoon" is the reason this split exists: it
+// used to live under Flood's terms and, because Flood was checked first,
+// silently mis-tagged a real post-monsoon HEATWAVE article as a Flood —
+// the article said "monsoon" constantly (monsoon withdrawal, post-monsoon
+// season) while describing the opposite hazard. Every hazard's strong
+// terms are now checked first, across ALL hazards, before any hazard's
+// weak terms are considered at all — so a sentence naming its hazard
+// explicitly is never out-voted by another hazard's looser context word.
+const HAZARD_TERMS: { hazard: Hazard; strong: string[]; weak: string[] }[] = [
+  { hazard: 'Flood', strong: ['flood', 'flooding', 'flooded'], weak: ['monsoon', 'deluge', 'inundat'] },
+  { hazard: 'Drought', strong: ['drought'], weak: ['dry spell', 'water scarcity', 'water stress'] },
+  { hazard: 'Cyclone', strong: ['cyclone', 'hurricane', 'typhoon'], weak: ['storm surge'] },
+  { hazard: 'Heatwave', strong: ['heatwave', 'heat wave'], weak: ['extreme heat', 'scorching'] },
+  { hazard: 'Landslide', strong: ['landslide', 'mudslide', 'rockslide'], weak: ['slope failure'] },
 ]
 
 export function detectHazard(text: string): Hazard | null {
-  const lower = text.toLowerCase()
-  for (const { hazard, terms } of HAZARD_TERMS) {
-    if (terms.some((t) => lower.includes(t))) return hazard
+  for (const { hazard, strong } of HAZARD_TERMS) {
+    if (strong.some((t) => termMatches(text, t))) return hazard
+  }
+  for (const { hazard, weak } of HAZARD_TERMS) {
+    if (weak.some((t) => termMatches(text, t))) return hazard
   }
   return null
 }
