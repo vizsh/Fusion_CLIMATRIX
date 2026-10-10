@@ -43,6 +43,7 @@ import {
 } from './answers'
 import { answerTour } from './tours'
 import { isDetailedFreeTextScenario, parseFreeTextScenario } from './freeTextScenario'
+import { correlateNewsWithPortfolio, isNewsCorrelationRequest } from './newsCorrelation'
 import { runScenarioAndReport } from './scenarioRunner'
 import { runIntent } from './tools'
 import {
@@ -241,6 +242,16 @@ export async function respondTo(message: string, state: ScenarioState): Promise<
   if (!detectRegion(text)) {
     const unmapped = detectUnmappedCity(text)
     if (unmapped) return { blocks: answerUnmappedCity(unmapped) }
+  }
+
+  // "Add a news source and ask how this affects my portfolio" — a pasted
+  // URL or explicit "this article"/"correlate this news" phrasing is
+  // checked before everything else below, since a URL is an unambiguous
+  // signal that would otherwise get swallowed by the generic news/route
+  // keyword rules further down (which answer from the ACTIVE scenario,
+  // not from what the pasted article actually says).
+  if (isNewsCorrelationRequest(text)) {
+    return { blocks: (await correlateNewsWithPortfolio(text, state)).blocks }
   }
 
   // Backend-bridge intents — genuinely async (a live HTTP call to the

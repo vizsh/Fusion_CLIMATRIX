@@ -316,6 +316,19 @@ class InsiderSummaryResult(BaseModel):
     note: str = "Reference real-market data for a comparable listed company — not connected to any synthetic CLIMATRIX company record."
 
 
+class ArticleExtractIn(BaseModel):
+    url: str
+
+
+class ArticleExtractResult(BaseModel):
+    title: str
+    text: str
+    excerpt: str
+    url: str
+    char_count: int
+    evidence_class: str = "sourced"
+
+
 class ProposedUpdateCreateIn(BaseModel):
     kind: str  # sector_vulnerability | transition_sensitivity | scenario_archetype | other
     target: str

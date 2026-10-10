@@ -34,7 +34,7 @@ const HAZARD_TERMS: { hazard: Hazard; terms: string[] }[] = [
   { hazard: 'Landslide', terms: ['landslide', 'mudslide', 'slope failure', 'rockslide'] },
 ]
 
-function detectHazard(text: string): Hazard | null {
+export function detectHazard(text: string): Hazard | null {
   const lower = text.toLowerCase()
   for (const { hazard, terms } of HAZARD_TERMS) {
     if (terms.some((t) => lower.includes(t))) return hazard

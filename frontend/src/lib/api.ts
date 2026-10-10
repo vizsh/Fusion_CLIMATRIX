@@ -127,6 +127,23 @@ export function searchNews(q: string) {
   return request<NewsResult>(`/api/news/search?q=${encodeURIComponent(q)}`)
 }
 
+export interface ExtractedArticle {
+  title: string
+  text: string
+  excerpt: string
+  url: string
+  char_count: number
+  evidence_class: string
+}
+
+/** Server-side fetch + readable-text extraction for a news URL the user
+ * pastes into the Copilot — a browser fetch() of an arbitrary external
+ * news site is blocked by CORS almost everywhere, so this has to go
+ * through the backend (`app/connectors/article_extractor.py`). */
+export function extractArticle(url: string) {
+  return request<ExtractedArticle>('/api/news/extract', { method: 'POST', body: JSON.stringify({ url }) })
+}
+
 export function searchMarketNews(q: string, minRelevance = 1) {
   return request<NewsResult>(`/api/news/market?q=${encodeURIComponent(q)}&min_relevance=${minRelevance}`)
 }

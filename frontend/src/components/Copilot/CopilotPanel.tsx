@@ -27,6 +27,10 @@ import { CopilotBlockView } from './CopilotBlocks'
 
 const QUICK_ACTIONS = [
   { label: 'Automate a scenario', prompt: 'Automate a scenario for me' },
+  {
+    label: 'Correlate a news source',
+    prompt: 'Add this news source and tell me how it affects my portfolio: https://timesofindia.indiatimes.com/city/thiruvananthapuram/gadkari-assures-steps-to-speed-up-highway-infrastructure-projects/articleshow/134793926.cms',
+  },
   { label: 'Explain this loss', prompt: 'How is expected credit loss actually calculated for this scenario?' },
   { label: 'Find bottlenecks', prompt: 'Which infrastructure nodes are the top bottleneck risks?' },
   { label: 'Compare scenarios', prompt: 'Compare Himachal Pradesh flood vs Mumbai flood scenarios' },
@@ -51,7 +55,7 @@ export default function CopilotPanel() {
         { kind: 'heading', text: 'CLIMATRIX Intelligence Copilot' },
         {
           kind: 'text',
-          text: "Institutional climate risk copilot. Operates the active scenario state, traces systemic transmission pathways, and evaluates financial balance-sheet impact using the same deterministic models as the workstation — nothing it says will disagree with what's on screen, and it never invents a number. Say \"automate\" and it will ask one question at a time, then build and run the scenario itself.",
+          text: "Institutional climate risk copilot. Operates the active scenario state, traces systemic transmission pathways, and evaluates financial balance-sheet impact using the same deterministic models as the workstation — nothing it says will disagree with what's on screen, and it never invents a number. Say \"automate\" and it will ask one question at a time, then build and run the scenario itself. Paste a news article URL (or just the text) and ask how it affects your portfolio — real article text in, real entity-matched, scenario-modelled impact out.",
         },
       ],
     },

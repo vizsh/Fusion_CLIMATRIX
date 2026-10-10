@@ -5,16 +5,18 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.connectors.alpha_ai import AlphaAiConnector
+from app.connectors.article_extractor import ArticleExtractorConnector
 from app.connectors.base import ConnectorStatus
 from app.connectors.news import NewsConnector
 from app.db.session import get_db
 from app.models import Company, NewsArticle, NewsEntityLink
-from app.schemas.schemas import InsiderSummaryResult, NewsQueryResult
+from app.schemas.schemas import ArticleExtractIn, ArticleExtractResult, InsiderSummaryResult, NewsQueryResult
 from app.services.nlp import link_entities
 
 router = APIRouter(prefix="/api", tags=["news"])
 _news = NewsConnector()
 _alphai = AlphaAiConnector()
+_extractor = ArticleExtractorConnector()
 
 # Region codes -> labels, mirroring the frontend's REGION_LABEL — used only
 # as the gazetteer for entity-linking, not as a source of scenario state.
@@ -118,6 +120,23 @@ async def search_market_news(q: str, min_relevance: int = 1, db: Session = Depen
         db.refresh(r)
 
     return NewsQueryResult(articles=rows, provider="AlphaAI", query=q, retrieved_at=now)
+
+
+@router.post("/news/extract", response_model=ArticleExtractResult)
+async def extract_article(payload: ArticleExtractIn):
+    """Server-side fetch + readable-text extraction for an arbitrary news
+    URL the user pastes into the Copilot — the one step of "add a news
+    source and ask how it affects my portfolio" that can't run in the
+    browser (CORS blocks a page's own fetch() of most external news
+    sites). Entity-linking against the portfolio graph and the financial
+    impact computation both happen client-side afterwards, reusing the
+    exact same engine every dashboard page already uses — this endpoint's
+    only job is turning a URL into real article text."""
+    result = await _extractor.fetch(url=payload.url)
+    if result.status != ConnectorStatus.OK:
+        raise HTTPException(status_code=502, detail=result.message)
+    row = result.data[0]
+    return ArticleExtractResult(**row)
 
 
 @router.get("/market/insider/{ticker}", response_model=InsiderSummaryResult)
