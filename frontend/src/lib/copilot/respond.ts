@@ -41,6 +41,8 @@ import {
   findInstitutionByName,
 } from './answers'
 import { answerTour } from './tours'
+import { isDetailedFreeTextScenario, parseFreeTextScenario } from './freeTextScenario'
+import { runScenarioAndReport } from './scenarioRunner'
 import { runIntent } from './tools'
 import {
   detectDurationMonths,
@@ -85,6 +87,31 @@ const RULES: { test: (t: string) => boolean; handler: (ctx: Ctx, t: string) => C
       const region = detectRegion(t)
       if (region) ctx.state.setRegion(region)
       return answerSetScenario(ctx.state, t)
+    },
+  },
+  // A free-text scenario description detailed enough to run directly —
+  // "a severe cyclone hits Kerala for 9 months with limited alternatives"
+  // — checked before the generic "what if" archetype-comparison rule
+  // below, which only fires on that literal phrase and would otherwise
+  // leave a specific description like this unanswered. Applies the parsed
+  // scenario to the live store AND reports it, same as the guided wizard.
+  {
+    test: (t) => isDetailedFreeTextScenario(t),
+    handler: (ctx, t) => {
+      const parsed = parseFreeTextScenario(t, {
+        region: ctx.state.region,
+        hazard: ctx.state.hazard,
+        severity: ctx.state.severity,
+        durationMonths: ctx.state.durationMonths,
+        substitutability: ctx.state.substitutability,
+      })
+      const result = runScenarioAndReport(
+        parsed.scenario,
+        ctx.state,
+        'Scenario understood and run',
+        parsed.notes.length ? parsed.notes.join(' ') : undefined,
+      )
+      return result.blocks
     },
   },
   {

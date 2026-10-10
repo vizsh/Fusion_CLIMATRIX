@@ -7,11 +7,32 @@
 // (stressPdLgd, computeEquityImpact, computeProtectionGap) every other
 // page already uses.
 
-import { AlertTriangle, Briefcase, ChevronDown, Info, Plus, Trash2, X } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { AlertTriangle, Briefcase, ChevronDown, Download, Info, Plus, Trash2, TrendingUp, X } from 'lucide-react'
+import ReactECharts from 'echarts-for-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import PageHeader from '../components/PageHeader'
-import { ALL_COMPANIES, HEADLINE_DURATION, HEADLINE_SEVERITY, buildDashboardSnapshot } from '../lib/portfolioDashboard'
+import { generatePortfolioTrajectoryBriefPdf } from '../lib/briefGenerators'
+import {
+  INTENSIFICATION_PATHWAYS,
+  TRAJECTORY_AMBIENT_SEVERITY,
+  computePortfolioTrajectory,
+  generatePortfolioTrajectoryRecommendations,
+  type IntensificationPathway,
+} from '../lib/climateTrajectory'
+import { ALL_COMPANIES, HEADLINE_DURATION, HEADLINE_SEVERITY, buildDashboardSnapshot, companiesInPortfolio } from '../lib/portfolioDashboard'
 import { useScenarioStore } from '../store/useScenarioStore'
+
+const PATHWAYS: IntensificationPathway[] = ['Low', 'Moderate', 'High']
+const REC_COLOR: Record<string, string> = {
+  act: 'border-risk-high/40 bg-risk-high/[0.06]',
+  watch: 'border-risk-med/40 bg-risk-med/[0.06]',
+  info: 'border-cyan/30 bg-cyan/[0.05]',
+}
+const REC_BADGE: Record<string, string> = {
+  act: 'border-risk-high/40 bg-risk-high/10 text-risk-high',
+  watch: 'border-risk-med/40 bg-risk-med/10 text-risk-med',
+  info: 'border-cyan/40 bg-cyan/10 text-cyan',
+}
 
 function fmtCr(n: number) {
   return `₹${n.toFixed(0)} cr`
@@ -99,11 +120,82 @@ export default function PortfolioDashboardPage() {
 
   const [pickerOpen, setPickerOpen] = useState(false)
   const [builderOpen, setBuilderOpen] = useState(false)
+  const [pathway, setPathway] = useState<IntensificationPathway>('Moderate')
+  const trajectoryChartRef = useRef<ReactECharts>(null)
+  const trajectoryChartWrapRef = useRef<HTMLDivElement>(null)
+
+  // ReactECharts measures its container once at mount; inside this
+  // fractional grid column that measurement can happen before the grid
+  // itself has settled a real width, leaving the canvas stuck at 0×200
+  // forever (its own ResizeObserver doesn't always catch a parent going
+  // from 0 to a real size on the very next paint). Watching the wrapper
+  // ourselves and forcing echarts to resize fixes it reliably.
+  useEffect(() => {
+    const el = trajectoryChartWrapRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => {
+      trajectoryChartRef.current?.getEchartsInstance().resize()
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   const activePortfolio = portfolios.find((p) => p.id === activePortfolioId) ?? null
   const snapshot = useMemo(() => buildDashboardSnapshot(activePortfolio, policyStringency), [activePortfolio, policyStringency])
   const maxHorizonEl = Math.max(...snapshot.horizons.map((h) => h.stressedElCr), 1e-9)
   const maxSectorContribution = Math.max(...snapshot.sectorRisk.map((s) => s.contribution), 1e-9)
+
+  const portfolioCompanies = useMemo(() => companiesInPortfolio(activePortfolio), [activePortfolio])
+  const trajectory = useMemo(
+    () => computePortfolioTrajectory(portfolioCompanies, pathway, policyStringency, TRAJECTORY_AMBIENT_SEVERITY, HEADLINE_DURATION),
+    [portfolioCompanies, pathway, policyStringency],
+  )
+  const trajectoryRecs = useMemo(() => generatePortfolioTrajectoryRecommendations(trajectory, pathway), [trajectory, pathway])
+
+  const trajectoryChartOption = useMemo(
+    () => ({
+      backgroundColor: 'transparent',
+      grid: { left: 56, right: 20, top: 24, bottom: 30 },
+      xAxis: {
+        type: 'category',
+        data: trajectory.points.map((p) => String(p.calendarYear)),
+        axisLine: { lineStyle: { color: '#1c2430' } },
+        axisTick: { show: false },
+        axisLabel: { color: '#94a3b8', fontSize: 10, fontFamily: 'JetBrains Mono' },
+      },
+      yAxis: {
+        type: 'value',
+        axisLine: { show: false },
+        axisTick: { show: false },
+        splitLine: { lineStyle: { color: '#141a24' } },
+        axisLabel: { color: '#64748b', fontSize: 10, formatter: (v: number) => `₹${v.toFixed(0)}cr` },
+      },
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: '#0f1620',
+        borderColor: '#1c2430',
+        textStyle: { color: '#e2e8f0', fontSize: 11 },
+        formatter: (params: { dataIndex: number }[]) => {
+          const p = trajectory.points[params[0].dataIndex]
+          return `${p.calendarYear} (severity ${p.severity}/100)<br/>Physical: ₹${p.stressedElCr.toFixed(0)} cr<br/>Transition: ₹${p.transitionAtRiskCr.toFixed(0)} cr<br/><b>Combined: ₹${p.combinedCr.toFixed(0)} cr</b>`
+        },
+      },
+      series: [
+        {
+          name: 'Combined climate-adjusted loss',
+          type: 'line',
+          smooth: true,
+          symbol: 'circle',
+          symbolSize: 6,
+          lineStyle: { color: '#22d3ee', width: 2.5 },
+          itemStyle: { color: '#22d3ee' },
+          areaStyle: { color: 'rgba(34, 211, 238, 0.12)' },
+          data: trajectory.points.map((p) => Number(p.combinedCr.toFixed(1))),
+        },
+      ],
+    }),
+    [trajectory],
+  )
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
@@ -295,6 +387,70 @@ export default function PortfolioDashboardPage() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Long-term climate trajectory */}
+        <div className="rounded-lg border border-line bg-panel-2 p-4">
+          <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 font-mono text-[10px] tracking-[0.15em] text-slate-500">
+              <TrendingUp size={12} className="text-cyan" /> LONG-TERM CLIMATE TRAJECTORY
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex rounded border border-line bg-panel p-0.5">
+                {PATHWAYS.map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setPathway(p)}
+                    title={INTENSIFICATION_PATHWAYS[p].desc}
+                    className={`rounded px-2.5 py-1 font-mono text-[9.5px] tracking-wide transition-colors ${
+                      pathway === p ? 'bg-cyan/15 text-cyan' : 'text-slate-500 hover:text-slate-300'
+                    }`}
+                  >
+                    {p.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() =>
+                  generatePortfolioTrajectoryBriefPdf(
+                    activePortfolio ? activePortfolio.name : 'Full India Book',
+                    trajectory,
+                    trajectoryRecs,
+                    pathway,
+                  )
+                }
+                className="flex items-center gap-1.5 rounded border border-cyan/40 bg-cyan/10 px-2.5 py-1 font-mono text-[9.5px] tracking-wide text-cyan hover:bg-cyan/20"
+              >
+                <Download size={11} /> BRIEF (PDF)
+              </button>
+            </div>
+          </div>
+          <p className="mb-3 max-w-3xl text-[10.5px] leading-relaxed text-slate-600">
+            How this same book's combined physical + transition climate-adjusted loss evolves over a 20-year horizon
+            under a selectable, disclosed intensification pathway — a gradual trajectory, not a single point-in-time
+            stress test, with recommendations derived from where the curve actually goes.
+          </p>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.3fr_1fr]">
+            <div ref={trajectoryChartWrapRef}>
+              <ReactECharts ref={trajectoryChartRef} option={trajectoryChartOption} style={{ height: 200, width: '100%' }} />
+              <div className="mt-1 text-center font-mono text-[9px] text-slate-600">
+                {INTENSIFICATION_PATHWAYS[pathway].label} — {INTENSIFICATION_PATHWAYS[pathway].desc}
+              </div>
+            </div>
+            <div className="space-y-2">
+              {trajectoryRecs.map((r, i) => (
+                <div key={i} className={`rounded border p-2.5 ${REC_COLOR[r.level]}`}>
+                  <div className="mb-1 flex items-center gap-1.5">
+                    <span className={`rounded-full border px-1.5 py-0.5 font-mono text-[7.5px] tracking-wide ${REC_BADGE[r.level]}`}>
+                      {r.level.toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="text-[11px] font-medium text-slate-200">{r.title}</div>
+                  <div className="mt-0.5 text-[10px] leading-relaxed text-slate-500">{r.detail}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

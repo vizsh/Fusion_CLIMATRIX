@@ -12,10 +12,8 @@
 // the Copilot, not like a bolted-on feature.
 
 import {
-  computeImpact,
   REGION_LABEL,
   SCENARIO_PROFILES,
-  summarizeImpactPlain,
   type Hazard,
   type Region,
   type ScenarioProfile,
@@ -23,7 +21,8 @@ import {
   type Substitutability,
 } from '../../store/useScenarioStore'
 import { detectRegion } from './params'
-import type { CopilotAction, CopilotBlock } from './types'
+import { runScenarioAndReport } from './scenarioRunner'
+import type { CopilotBlock } from './types'
 
 export type WizardStep = 'region' | 'hazard' | 'severity' | 'customSeverity' | 'duration' | 'substitutability'
 
@@ -209,53 +208,12 @@ function finish(
   w: WizardState & { region: Region; hazard: Hazard; severity: number; durationMonths: number; substitutability: Substitutability },
   currentState: ScenarioState,
 ): WizardAdvanceResult {
-  // Apply the collected answers to the shared store NOW — the same object
-  // every dashboard page reads — so the guided answer and the dashboards
-  // can never disagree, exactly like every other Copilot action.
-  currentState.setRegion(w.region)
-  currentState.setHazard(w.hazard)
-  currentState.setSeverity(w.severity)
-  currentState.setDuration(w.durationMonths)
-  currentState.setSubstitutability(w.substitutability)
-
-  const impact = computeImpact({
-    region: w.region,
-    severity: w.severity,
-    durationMonths: w.durationMonths,
-    substitutability: w.substitutability,
-    interventions: [],
-  })
-  const summary = summarizeImpactPlain(w.region, w.hazard, w.severity, w.durationMonths, impact)
-
-  const actions: CopilotAction[] = [
-    { id: 'wiz-map', label: 'Watch it play out on the live map', kind: 'go-to-map', region: w.region, hazard: w.hazard, severity: w.severity, durationMonths: w.durationMonths, substitutability: w.substitutability },
-    { id: 'wiz-portfolio', label: 'Open Portfolio Impact', kind: 'navigate', to: '/portfolio', region: w.region },
-    { id: 'wiz-insurance', label: 'Check the insurance view', kind: 'navigate', to: '/insurance', region: w.region },
-    { id: 'wiz-brief', label: 'Download a scenario brief', kind: 'download-brief', briefRegion: w.region },
-  ]
-
-  return {
-    wizard: null,
-    blocks: [
-      { kind: 'heading', text: `Scenario built and run — ${REGION_LABEL[w.region]}` },
-      {
-        kind: 'statRow',
-        stats: [
-          { label: 'Baseline EL', value: `₹${impact.baselineEl.toFixed(1)} cr`, evidence: 'modelled' },
-          { label: 'Stressed EL', value: `₹${impact.stressedEl.toFixed(1)} cr`, evidence: 'modelled' },
-          { label: 'Borrowers reached', value: String(impact.companyCount), evidence: 'modelled' },
-        ],
-      },
-      text(summary),
-      {
-        kind: 'table',
-        headers: ['Sector', 'EAD', 'Stressed EL'],
-        rows: impact.bySector.slice(0, 5).map((s) => [s.sector, `₹${s.eadCr.toFixed(1)} cr`, `₹${s.stressedEl.toFixed(1)} cr`]),
-      },
-      text(
-        `These dials are now live everywhere — Scenario Lab, Digital Twin, Dependency Explorer and Portfolio Impact all read the same ${w.region}/${w.hazard}/${w.severity}/${w.durationMonths}mo/${w.substitutability} configuration you just built. Say "automate" again to build another one.`,
-      ),
-      { kind: 'actions', actions },
-    ],
-  }
+  const closingNote = `These dials are now live everywhere — Scenario Lab, Digital Twin, Dependency Explorer and Portfolio Impact all read the same ${w.region}/${w.hazard}/${w.severity}/${w.durationMonths}mo/${w.substitutability} configuration you just built. Say "automate" again to build another one.`
+  const result = runScenarioAndReport(
+    { region: w.region, hazard: w.hazard, severity: w.severity, durationMonths: w.durationMonths, substitutability: w.substitutability },
+    currentState,
+    'Scenario built and run',
+    closingNote,
+  )
+  return { wizard: null, blocks: result.blocks }
 }
