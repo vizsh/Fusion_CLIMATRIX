@@ -40,7 +40,9 @@ export const REGION_ALIASES: { region: Region; terms: string[] }[] = [
 // Real Indian financial/population centers this graph does NOT model yet —
 // answering silently as if they were the active region would be a quiet
 // fabrication, so these get an honest "not modeled, here's the nearest
-// comparable one" response instead.
+// comparable one" response instead. Deliberately broad: a narrow list just
+// means more unmapped cities silently fall through to the wrong rule (see
+// detectOutOfScopeDomain's doc comment for the bug this caused in practice).
 export const UNMAPPED_CITIES: { name: string; terms: string[]; nearest: Region }[] = [
   { name: 'Chennai', terms: ['chennai', 'madras'], nearest: 'KL' },
   { name: 'Bengaluru', terms: ['bengaluru', 'bangalore'], nearest: 'KL' },
@@ -48,7 +50,59 @@ export const UNMAPPED_CITIES: { name: string; terms: string[]; nearest: Region }
   { name: 'Hyderabad', terms: ['hyderabad', 'telangana'], nearest: 'MH' },
   { name: 'Kolkata', terms: ['kolkata', 'calcutta', 'west bengal'], nearest: 'KL' },
   { name: 'Ahmedabad / Gujarat', terms: ['ahmedabad', 'surat', 'gujarat'], nearest: 'MH' },
+  { name: 'Indore / Madhya Pradesh', terms: ['indore', 'madhya pradesh', 'bhopal'], nearest: 'MH' },
+  { name: 'Pune', terms: ['pune'], nearest: 'MH' },
+  { name: 'Jaipur / Rajasthan', terms: ['jaipur', 'rajasthan', 'jodhpur', 'udaipur'], nearest: 'MH' },
+  { name: 'Lucknow / Uttar Pradesh', terms: ['lucknow', 'uttar pradesh', 'kanpur', 'varanasi', 'ayodhya'], nearest: 'HP' },
+  { name: 'Patna / Bihar', terms: ['patna', 'bihar'], nearest: 'HP' },
+  { name: 'Chandigarh / Punjab', terms: ['chandigarh', 'punjab', 'ludhiana', 'amritsar'], nearest: 'HP' },
+  { name: 'Nagpur', terms: ['nagpur', 'vidarbha'], nearest: 'MH' },
+  { name: 'Bhubaneswar / Odisha', terms: ['bhubaneswar', 'odisha', 'orissa', 'puri'], nearest: 'KL' },
+  { name: 'Visakhapatnam / Andhra Pradesh', terms: ['visakhapatnam', 'vizag', 'andhra pradesh', 'amaravati'], nearest: 'KL' },
+  { name: 'Coimbatore / Tamil Nadu', terms: ['coimbatore', 'tamil nadu', 'madurai', 'tiruchirappalli'], nearest: 'KL' },
+  { name: 'Goa', terms: ['goa', 'panaji'], nearest: 'KL' },
+  { name: 'Jammu & Kashmir', terms: ['srinagar', 'jammu and kashmir', 'jammu & kashmir', 'kashmir'], nearest: 'HP' },
+  { name: 'Northeast India', terms: ['guwahati', 'assam', 'shillong', 'meghalaya'], nearest: 'KL' },
 ]
+
+// Risk categories this platform has zero data, connector or model for —
+// a question like "is my supply-chain route affected by political rallies"
+// used to silently match the freight/route rule's keyword and get answered
+// with whatever the CURRENT scenario's region happened to be (e.g. a
+// Himachal Pradesh flood corridor), which is a quiet fabrication: the
+// platform substituted an unrelated climate answer for a political-risk
+// question it has no actual basis to answer. Checked FIRST, before any
+// region/route/hazard rule, so a domain mismatch is caught regardless of
+// which other keywords the question happens to also contain.
+const OUT_OF_SCOPE_DOMAINS: { domain: string; terms: string[] }[] = [
+  {
+    domain: 'political unrest or civil disturbance',
+    terms: ['political rally', 'political rallies', 'protest', 'bandh', 'riot', 'civil unrest', 'curfew', 'election', 'strike action', 'agitation'],
+  },
+  {
+    domain: 'security, terrorism or armed conflict',
+    terms: ['terroris', 'war', 'military conflict', 'armed conflict', 'insurgency', 'cyberattack', 'cyber attack', 'sabotage', 'border conflict'],
+  },
+  {
+    domain: 'pandemic or public-health risk',
+    terms: ['pandemic', 'epidemic', 'disease outbreak', 'covid'],
+  },
+  {
+    domain: 'currency, interest-rate or broad macroeconomic risk',
+    terms: ['interest rate', 'currency devaluation', 'inflation shock', 'recession', 'stock market crash', 'rbi repo rate'],
+  },
+]
+
+/** Returns the unmodeled risk domain a question is actually about, or null
+ * if it isn't one of these — never a guess, only an explicit keyword match,
+ * same discipline as every other detector in this file. */
+export function detectOutOfScopeDomain(text: string): string | null {
+  const lower = text.toLowerCase()
+  for (const { domain, terms } of OUT_OF_SCOPE_DOMAINS) {
+    if (terms.some((t) => lower.includes(t))) return domain
+  }
+  return null
+}
 
 export function detectRegion(text: string): Region | null {
   const lower = text.toLowerCase()
