@@ -85,6 +85,27 @@ export function answerUnmappedCity(city: { name: string; nearest: Region }): Cop
   ]
 }
 
+/** The honest "I understand the question, but I have nothing to answer it
+ * with" response — for risk categories (political unrest, security,
+ * pandemic, macro) this platform has zero data, connector or model for.
+ * Exists specifically because the freight/route rule used to match on a
+ * bare keyword like "supply chain route" and answer with the CURRENT
+ * scenario's region regardless of what was actually asked — a quiet
+ * fabrication this function replaces with an explicit scope boundary. */
+export function answerOutOfScope(domain: string): CopilotBlock[] {
+  return [
+    { kind: 'heading', text: "That's outside what this platform models" },
+    {
+      kind: 'text',
+      text: `This question is about ${domain}, not a physical climate hazard. CLIMATRIX only models five hazard types — Flood, Drought, Cyclone, Heatwave, Landslide — propagating through infrastructure, suppliers and financial exposure. It has no data, connector or model for ${domain}, so rather than substitute the active climate scenario as if it answered this, I'm telling you directly: I don't know, and this tool can't compute an answer here.`,
+    },
+    {
+      kind: 'text',
+      text: 'If you meant a climate-hazard question, try something like "what if a flood hits Kerala" or "show me the freight routes for Himachal Pradesh". For political, security or macro risk specifically, you\'ll need a dedicated source for that — not this platform.',
+    },
+  ]
+}
+
 export function answerPortfolio(): CopilotBlock[] {
   const overview = generatePortfolioOverview()
   const top = overview.byLoss[0]

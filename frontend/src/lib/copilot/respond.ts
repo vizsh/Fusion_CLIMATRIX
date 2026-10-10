@@ -29,6 +29,7 @@ import {
   answerInsurance,
   answerInstitution,
   answerMethodology,
+  answerOutOfScope,
   answerPortfolio,
   answerReverseStressTest,
   answerRoutes,
@@ -47,6 +48,7 @@ import { runIntent } from './tools'
 import {
   detectDurationMonths,
   detectHorizon,
+  detectOutOfScopeDomain,
   detectRegion,
   detectRegions,
   detectSeverity,
@@ -222,6 +224,16 @@ export async function respondTo(message: string, state: ScenarioState): Promise<
   if (/^help$|what can you do|^hi$|^hello$/i.test(text)) return { blocks: answerHelp() }
 
   const ctx: Ctx = { state }
+
+  // An unmodeled risk DOMAIN (political unrest, security, pandemic, macro)
+  // gets an honest "out of scope" answer before anything else — checked
+  // even before region/city matching, because a question like "is my
+  // supply-chain route affected by political rallies" would otherwise hit
+  // the freight/route keyword rule below and get answered with the
+  // CURRENT scenario's region, which has nothing to do with what was
+  // actually asked.
+  const outOfScope = detectOutOfScopeDomain(text)
+  if (outOfScope) return { blocks: answerOutOfScope(outOfScope) }
 
   // An unmapped city gets an honest disclosure before anything else —
   // never silently substitute the active region for a place the graph
