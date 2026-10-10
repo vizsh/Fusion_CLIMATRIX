@@ -27,6 +27,9 @@ screenshots.
 | Near/medium/long horizon comparison | `computeHorizonComparison()`, reuses existing severity/duration dial shape | Modeled |
 | Derived alerts (region concentration, bottleneck exposure) | `computeDashboardAlerts()` — recomputed live, no persisted timestamps | Modeled |
 | Named portfolios (custom holding subsets) | `useScenarioStore` — `portfolios`/`activePortfolioId`, localStorage-backed | Real |
+| **Long-term climate trajectory** — 20-year gradual-intensification view, separate from the point-in-time stress dial | `lib/climateTrajectory.ts` → `computePortfolioTrajectory()`, selectable Low/Moderate/High pathway; starts from a disclosed ambient baseline (not the 80/100 stress severity) specifically so the three pathways stay distinguishable instead of all converging at the 100-point cap | Modelled, disclosed pathway assumption |
+| Rule-based, auditable trajectory recommendations | `generatePortfolioTrajectoryRecommendations()` — thresholded against the trajectory's own numbers (share of EAD, sector concentration, back-half acceleration), never a generic platitude | Modelled |
+| Downloadable trajectory brief (PDF) | `generatePortfolioTrajectoryBriefPdf()` (`lib/briefGenerators.ts`, `lib/pdfBrief.ts` — client-side jsPDF, light-themed) | Real |
 
 ## 1b. Governance & Proposals (`/governance`)
 
@@ -139,8 +142,19 @@ screenshots.
 | Worst-case and favorable-scenario narratives per company | Hand-written, reasoned per sector — e.g. cement/infra majors modeled as reconstruction-demand beneficiaries | Assumption, disclosed |
 | Live real-news search per company | `searchNews()` → backend NewsAPI/GNews connector | Sourced |
 | Full `ScenarioConsole` (region/hazard/severity/duration/substitutability) | Replaced the original severity-only slider, which left this page's content identical regardless of which disaster scenario was active elsewhere in the app | Real |
+| **Long-term climate trajectory — a factor for new-position due diligence** | `lib/climateTrajectory.ts` → `computeSensitivityTrajectory()`/`verdictForCompanyTrajectory()`, selectable Low/Moderate/High pathway; reuses `computeSensitivityIndex()` at a drifted severity per year rather than a second formula | Modelled, disclosed pathway assumption |
+| Verdict + auditable reasoning (Monitor / Elevated / High / Low concern) | `verdictForCompanyTrajectory()` — a beneficiary direction overrides a high index; an off-sector hazard or a steep trajectory delta is named explicitly in the reasoning, never a bare label | Modelled |
+| Downloadable company brief (PDF) | `generateCompanyBriefPdf()` — snapshot, trajectory table, verdict, worst-case/favorable framing | Real |
 
-## 8b. Reverse Stress Test (Copilot-only — no dedicated page)
+## 8b. What-If Analysis — free-text scenario understanding (`/what-if`)
+
+| Feature | Implementation | Tag |
+|---|---|---|
+| "Describe the scenario you envision" free-text box | `lib/copilot/freeTextScenario.ts` → `parseFreeTextScenario()` — resolves region, hazard, severity (number or descriptive word), duration (months/years/"a couple of months") and substitutability from an unstructured sentence; every unresolved field defaults honestly and the default is shown, not hidden | Real (rule-based parser, not an LLM call) |
+| Applies the parsed scenario live and reports it | `lib/copilot/scenarioRunner.ts` → `runScenarioAndReport()` — shared with the Copilot's guided wizard and its detailed-free-text chat rule, so all three entry points report the exact same stat/table shape | Modelled |
+| Downloadable scenario brief (PDF), includes the original text verbatim | `generateScenarioBriefPdf()` | Real |
+
+## 8c. Reverse Stress Test (Copilot-only — no dedicated page)
 
 | Feature | Implementation | Tag |
 |---|---|---|
@@ -174,6 +188,8 @@ page uses (`lib/copilot/answers.ts`).
 | Feature | Implementation | Tag |
 |---|---|---|
 | Natural-language scenario control ("set severity to 85...") | `answerSetScenario` — actually calls the store setters, not just describes | Real action |
+| Detailed free-text scenario understanding ("a severe cyclone hits Kerala for 9 months, limited alternatives") | `lib/copilot/freeTextScenario.ts` + `runScenarioAndReport()` — runs the SPECIFIC parsed scenario directly instead of the generic archetype comparison, checked before the plain "what if" rule so a vague mention still falls through to archetypes | Real action |
+| **Guided scenario automation ("automate a scenario for me")** | `lib/copilot/automation.ts` — a stateful wizard layered on top of the stateless rule engine; asks region → hazard → severity (preset or custom) → duration → substitutability one at a time (click a chip or type free text), then sets every dial, runs `computeImpact`, and reports the outcome with the same stat/table blocks every other answer uses. "cancel" exits without changing anything; an unrecognized answer re-asks instead of guessing | Real action |
 | Company/institution lookup, region comparison, methodology explainer | `answerCompanyLookup`, `answerCompareRegions`, `answerMethodology` | Modeled |
 | What-If multi-scenario + portfolio overview, downloadable briefs | `engine.ts`'s `generateWhatIf`/`generatePortfolioOverview` | Modeled |
 | Reverse stress test, ML anomaly bridge, semantic news search | `answerReverseStressTest`, `answerWeatherAnomaly`, `answerBackendNewsSearch` | Modeled / Sourced |

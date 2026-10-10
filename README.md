@@ -167,6 +167,19 @@ the "why does this matter" case is made before any dial is touched.
   localStorage-backed, same pattern as saved scenarios) so "my portfolio"
   scopes every KPI/alert/sector figure to an actual named book instead of
   implicitly the whole graph.
+- **Long-term climate trajectory** (`lib/climateTrajectory.ts`): a genuinely
+  different question from the point-in-time stress dial above — how this
+  same book's combined physical + transition climate-adjusted loss evolves
+  over a 20-year horizon under a selectable, disclosed Low/Moderate/High
+  intensification pathway. Deliberately starts from a lower ambient
+  baseline (not the 80/100 stress-test severity) specifically so the three
+  pathways stay visibly distinguishable instead of all converging at the
+  100-point cap by year 20 — a real calibration bug caught and fixed via
+  live testing, where Moderate and High both looked identical because the
+  transition-risk term wasn't scaling with the pathway either. Rule-based
+  recommendations are thresholded against the trajectory's own numbers
+  (share of EAD, sector concentration, back-half acceleration), and the
+  whole thing downloads as a structured PDF brief.
 
 ### Governance & Proposals (`/governance`) — a Griid-pattern assumption queue
 - Propose a change to a disclosed modelling assumption (sector vulnerability,
@@ -243,6 +256,15 @@ the "why does this matter" case is made before any dial is touched.
   85 and duration to 9 months" actually moves the live scenario dials
   (every page updates, not just the chat), "guide me to the map" navigates
   and starts the simulation clock, "download a brief" produces the file.
+- **Guided scenario automation** — say "automate a scenario for me" and the
+  Copilot asks one question at a time (region, hazard, severity, duration,
+  substitutability — click a chip or just type), applies every answer to
+  the live dials as it goes, then runs the exact engine every dashboard
+  page uses and reports the outcome itself: stressed loss, sector
+  breakdown, and one-click follow-ups to watch it on the live map, open
+  Portfolio Impact, or check insurance. "cancel" exits cleanly at any step;
+  an unrecognized answer re-asks instead of guessing
+  (`lib/copilot/automation.ts`).
 - **Company and institution lookup by name** — ask about a specific
   borrower or bank/insurer and get its live, scenario-adjusted exposure,
   insurance-adjusted LGD, and dependency path — not a keyword search.
@@ -268,6 +290,13 @@ the "why does this matter" case is made before any dial is touched.
 - **Voice input/output, OFF by default** — opt-in mic and speaker toggles
   (browser Web Speech API, zero server cost); text stays the primary mode.
 
+#### Using the What-If simulator from the chatbot
+No need to open the What-If Analysis page at all — three ways to drive it from the Copilot panel (bottom-right, every page):
+1. **Describe a specific scenario and it runs directly.** "A severe cyclone hits Kerala for 9 months with limited supply-chain alternatives" is detailed enough (a hazard plus at least one of severity/duration/substitutability) to parse and run immediately — region, hazard, severity, duration and substitutability all get set live and reported with the same stat/sector breakdown every other answer uses, no archetypes generated.
+2. **Name just a region and hazard, no detail, and it compares archetypes instead.** "What if there's a flood in Kerala?" doesn't carry enough signal to run one precise scenario, so it falls back to the autonomous 4-archetype comparison (facility-level, severe regional, severe + supply-chain strain, compound/prolonged) ranked by loss, likelihood, priority and cumulative exposure — exactly what the What-If Analysis page's own default view shows.
+3. **Say "automate" for a guided, click-through version of the same thing** — the Copilot asks region → hazard → severity → duration → substitutability one question at a time (click a chip or type an answer), then builds and runs it exactly like option 1.
+All three apply the scenario to the live dashboard state (so Scenario Lab, Digital Twin, Portfolio Impact etc. all update too) and offer a "download a scenario brief" follow-up action.
+
 ### Real Market Climate Sensitivity — real companies, disclosed framework
 A separate lens from the synthetic portfolio: 18 real, publicly listed
 Indian companies (Taj/Indian Hotels, Adani Green, L&T, UltraTech Cement,
@@ -287,6 +316,32 @@ types this sector is actually exposed to"), its worst-case scenario, how
 it could favor them, and a **live real-news search** via the backend's
 NewsAPI/GNews connector. Clearly disclosed as this prototype's own
 illustrative framework — never a sourced ESG rating or investment advice.
+- **Long-term climate trajectory — a factor for new-position due diligence**:
+  the same intensification-pathway mechanic as the Portfolio Dashboard,
+  applied to one company's sensitivity index instead of a portfolio's ₹cr
+  loss — "where does this company's exposure trend over 20 years if I'm
+  weighing whether to take a position now." Produces a verdict (Monitor /
+  Elevated — mitigate before committing / High — reconsider or price in a
+  premium / Low long-term concern) with named, auditable reasons, not a
+  bare label — a beneficiary direction overrides a high index, an
+  off-sector hazard or a steep trajectory delta gets called out explicitly.
+  Downloads as a structured company-brief PDF.
+
+### What-If Analysis — free-text scenario understanding (`/what-if`)
+Beyond the page's autonomous archetype generator: a **"describe the
+scenario you envision"** box (`lib/copilot/freeTextScenario.ts`) that
+parses an unstructured sentence — region, hazard, a descriptive or numeric
+severity, duration in months/years/"a couple of months", and supply-chain
+substitutability — applies it live to the shared scenario state, and runs
+it through the exact same engine every page uses. Every field it couldn't
+find in the text is defaulted and the default is **shown, not hidden**
+("No duration found — defaulted to 6 months"), the same evidence-integrity
+standard as the rest of the app. The same parser also backs a new Copilot
+chat rule, so describing a detailed scenario in the chatbot ("a severe
+cyclone hits Kerala for 9 months with limited alternatives") runs that
+exact scenario directly instead of the generic archetype comparison — see
+"Using the What-If simulator from the chatbot" below. Results download as
+a structured PDF brief that includes the original text verbatim.
 
 ### Scenario engine (shared by every view above)
 - One Zustand store (`useScenarioStore`) is the single source of truth for
@@ -398,6 +453,7 @@ rationale, including why SQLite over Postgres/PostGIS at this stage.
 | 3D map | MapLibre GL JS (`react-map-gl`) — real terrain, no Cesium, no API key |
 | Graph visualization | `@xyflow/react` + `dagre` auto-layout |
 | Charts | `echarts-for-react` |
+| PDF briefs | `jsPDF` — client-side generation, no backend round trip, light-themed |
 | Animation | `framer-motion` |
 | Styling | Tailwind CSS v4 |
 | Backend | FastAPI, SQLAlchemy 2.0, Pydantic v2 |

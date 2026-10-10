@@ -1,8 +1,15 @@
-import { AlertTriangle, ExternalLink, Search, Sparkles } from 'lucide-react'
+import { AlertTriangle, Download, ExternalLink, Search, Sparkles, TrendingUp } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import PageHeader from '../components/PageHeader'
 import ScenarioConsole from '../components/ScenarioConsole'
 import { searchNews, type NewsArticle } from '../lib/api'
+import { generateCompanyBriefPdf } from '../lib/briefGenerators'
+import {
+  INTENSIFICATION_PATHWAYS,
+  computeSensitivityTrajectory,
+  verdictForCompanyTrajectory,
+  type IntensificationPathway,
+} from '../lib/climateTrajectory'
 import {
   DIRECTION_META,
   rankBySensitivity,
@@ -10,6 +17,8 @@ import {
   type SensitivityResult,
 } from '../lib/realMarketSensitivity'
 import { REGION_LABEL, useScenarioStore } from '../store/useScenarioStore'
+
+const PATHWAYS: IntensificationPathway[] = ['Low', 'Moderate', 'High']
 
 export default function RealMarketSensitivityPage() {
   const { region, hazard, severity, durationMonths } = useScenarioStore()
@@ -107,11 +116,12 @@ function SensitivityRow({ result, active, onClick }: { result: SensitivityResult
 }
 
 function EntityDetail({ result }: { result: SensitivityResult }) {
-  const { entity, sensitivityIndex } = result
+  const { entity, sensitivityIndex, hazardRelevant } = result
   const { region, hazard, severity, durationMonths } = useScenarioStore()
   const meta = DIRECTION_META[entity.direction]
   const [news, setNews] = useState<NewsArticle[] | null>(null)
   const [newsState, setNewsState] = useState<'idle' | 'loading' | 'error'>('idle')
+  const [pathway, setPathway] = useState<IntensificationPathway>('Moderate')
 
   async function fetchNews() {
     setNewsState('loading')
@@ -126,14 +136,30 @@ function EntityDetail({ result }: { result: SensitivityResult }) {
   }
 
   const summary = summarizePortfolioEffect(result, region, hazard, severity, durationMonths)
+  const trajectory = useMemo(
+    () => computeSensitivityTrajectory(entity, severity, durationMonths, hazard, pathway),
+    [entity, severity, durationMonths, hazard, pathway],
+  )
+  const verdict = useMemo(() => verdictForCompanyTrajectory(entity, trajectory, hazardRelevant, pathway), [entity, trajectory, hazardRelevant, pathway])
 
   return (
     <div className="rounded-lg border border-line bg-panel-2 p-4">
       <div className="mb-1 flex items-center justify-between gap-3">
         <h2 className="text-[15px] font-semibold text-white">{entity.name}</h2>
-        <span className="shrink-0 rounded border px-2 py-0.5 font-mono text-[9.5px] tracking-wide" style={{ borderColor: meta.color, color: meta.color }}>
-          {meta.label.toUpperCase()}
-        </span>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <span className="rounded border px-2 py-0.5 font-mono text-[9.5px] tracking-wide" style={{ borderColor: meta.color, color: meta.color }}>
+            {meta.label.toUpperCase()}
+          </span>
+          <button
+            onClick={() =>
+              generateCompanyBriefPdf(entity, result, trajectory, verdict, { region, hazard, severity, durationMonths }, pathway, summary)
+            }
+            title="Download a PDF brief: snapshot, long-term trajectory, verdict and reasoning, worst-case/favorable framing"
+            className="flex items-center gap-1 rounded border border-cyan/40 bg-cyan/10 px-2 py-0.5 font-mono text-[9px] tracking-wide text-cyan hover:bg-cyan/20"
+          >
+            <Download size={10} /> BRIEF (PDF)
+          </button>
+        </div>
       </div>
       <div className="mb-3 text-[11px] text-slate-500">
         NSE: {entity.nseSymbol} · {entity.sector}
@@ -162,6 +188,57 @@ function EntityDetail({ result }: { result: SensitivityResult }) {
 
       <p className="mb-1 font-mono text-[9.5px] tracking-wide text-risk-low">HOW IT COULD FAVOR THEM</p>
       <p className="mb-4 text-[11.5px] leading-relaxed text-slate-400">{entity.favorable}</p>
+
+      <div className="mb-4 rounded border border-line bg-panel p-3">
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+          <span className="font-mono text-[9.5px] tracking-wide text-slate-500">
+            <TrendingUp size={11} className="mr-1 inline text-cyan" /> LONG-TERM CLIMATE TRAJECTORY — FACTOR TO CONSIDER
+          </span>
+          <div className="flex rounded border border-line bg-panel-2 p-0.5">
+            {PATHWAYS.map((p) => (
+              <button
+                key={p}
+                onClick={() => setPathway(p)}
+                title={INTENSIFICATION_PATHWAYS[p].desc}
+                className={`rounded px-2 py-0.5 font-mono text-[8.5px] tracking-wide transition-colors ${
+                  pathway === p ? 'bg-cyan/15 text-cyan' : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                {p.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="mb-2 text-[10px] leading-relaxed text-slate-600">
+          How this company's sensitivity index drifts over a 20-year horizon under a disclosed, gradually
+          intensifying pathway — the question to weigh before committing capital, not just where it stands today.
+        </p>
+        <div className="mb-2.5 grid grid-cols-5 gap-1">
+          {trajectory.map((pt) => (
+            <div key={pt.yearsOut} className="rounded border border-line bg-panel-2 px-1.5 py-1.5 text-center">
+              <div className="font-mono text-[8px] text-slate-600">{pt.calendarYear}</div>
+              <div className="mt-0.5 font-mono-tnum text-[13px] font-semibold" style={{ color: verdict.color }}>
+                {pt.sensitivityIndex}
+              </div>
+              <div className="h-1 w-full overflow-hidden rounded-full bg-line-soft">
+                <div className="h-full rounded-full" style={{ width: `${pt.sensitivityIndex}%`, background: verdict.color }} />
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="rounded border p-2.5" style={{ borderColor: verdict.color + '66', background: verdict.color + '0f' }}>
+          <div className="mb-1 font-mono text-[9px] font-semibold tracking-wide" style={{ color: verdict.color }}>
+            {verdict.verdict.toUpperCase()}
+          </div>
+          <ul className="space-y-1">
+            {verdict.reasoning.map((r, i) => (
+              <li key={i} className="text-[10.5px] leading-relaxed text-slate-400">
+                {r}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
 
       <div className="rounded border border-line bg-panel p-3">
         <div className="mb-2 flex items-center justify-between">

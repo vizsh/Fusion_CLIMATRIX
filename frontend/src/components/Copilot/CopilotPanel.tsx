@@ -16,7 +16,9 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useScenarioStore } from '../../store/useScenarioStore'
+import { advanceWizard, cancelWizardBlocks, isAutomationTrigger, isWizardCancel, startWizard, type WizardState } from '../../lib/copilot/automation'
 import { copyContextBundle, copyShareableLink, downloadContextBundle } from '../../lib/copilot/contextExport'
+import { downloadBrief, downloadPortfolioBrief, generatePortfolioOverview, generateWhatIf } from '../../lib/copilot/engine'
 import { ollamaStatus, warmUpOllama } from '../../lib/copilot/ollamaClient'
 import { respondTo } from '../../lib/copilot/respond'
 import type { CopilotAction, CopilotTurn } from '../../lib/copilot/types'
@@ -24,6 +26,7 @@ import { isVoiceInputSupported, isVoiceOutputSupported, speak, speechFromBlocks,
 import { CopilotBlockView } from './CopilotBlocks'
 
 const QUICK_ACTIONS = [
+  { label: 'Automate a scenario', prompt: 'Automate a scenario for me' },
   { label: 'Explain this loss', prompt: 'How is expected credit loss actually calculated for this scenario?' },
   { label: 'Find bottlenecks', prompt: 'Which infrastructure nodes are the top bottleneck risks?' },
   { label: 'Compare scenarios', prompt: 'Compare Himachal Pradesh flood vs Mumbai flood scenarios' },
@@ -48,7 +51,7 @@ export default function CopilotPanel() {
         { kind: 'heading', text: 'CLIMATRIX Intelligence Copilot' },
         {
           kind: 'text',
-          text: 'Institutional climate risk copilot. Operates the active scenario state, traces systemic transmission pathways, and evaluates financial balance-sheet impact using the same deterministic models as the workstation.',
+          text: "Institutional climate risk copilot. Operates the active scenario state, traces systemic transmission pathways, and evaluates financial balance-sheet impact using the same deterministic models as the workstation — nothing it says will disagree with what's on screen, and it never invents a number. Say \"automate\" and it will ask one question at a time, then build and run the scenario itself.",
         },
       ],
     },
@@ -58,6 +61,11 @@ export default function CopilotPanel() {
   const [listening, setListening] = useState(false)
   const [voiceOut, setVoiceOut] = useState(false)
   const [justCopied, setJustCopied] = useState<'bundle' | 'link' | null>(null)
+  // Guided-automation wizard: when set, send() routes to advanceWizard()
+  // instead of the stateless rule engine, so "automate" can ask follow-up
+  // questions across several turns rather than needing one message to
+  // carry the whole scenario.
+  const [wizard, setWizard] = useState<WizardState | null>(null)
   const stopListenRef = useRef<() => void>(() => {})
   const scrollRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
@@ -92,20 +100,56 @@ export default function CopilotPanel() {
     }
   }
 
+  function applyDials(action: CopilotAction) {
+    // setRegion resets hazard to that region's own default, so an explicit
+    // action.hazard (e.g. from the guided scenario builder) must be applied
+    // AFTER the region — otherwise a non-default hazard choice (Cyclone on
+    // Kerala, say) silently reverts the instant the region is set.
+    if (action.region) state.setRegion(action.region)
+    if (action.hazard) state.setHazard(action.hazard)
+    if (action.severity !== undefined) state.setSeverity(action.severity)
+    if (action.durationMonths !== undefined) state.setDuration(action.durationMonths)
+    if (action.substitutability) state.setSubstitutability(action.substitutability)
+  }
+
   function runAction(action: CopilotAction) {
-    if (action.kind === 'navigate' && action.to) {
-      navigate(action.to)
-    } else if (action.kind === 'select-entity' && action.entityId) {
-      state.setSelectedEntity(action.entityId)
-    } else if (action.kind === 'apply-scenario') {
-      if (action.region) state.setRegion(action.region)
-      if (action.hazard) state.setHazard(action.hazard)
-      if (typeof action.severity === 'number') state.setSeverity(action.severity)
-      if (typeof action.durationMonths === 'number') state.setDuration(action.durationMonths)
-      if (action.substitutability) state.setSubstitutability(action.substitutability)
-    } else if (action.kind === 'go-to-map') {
-      if (action.region) state.setRegion(action.region)
-      navigate('/app/digital-twin')
+    switch (action.kind) {
+      case 'navigate':
+        if (action.region) state.setRegion(action.region)
+        if (action.to) navigate(action.to)
+        break
+      case 'apply-scenario':
+        applyDials(action)
+        navigate('/scenario')
+        break
+      case 'go-to-map':
+        // Navigate AND start the simulation clock — "guide me to the map
+        // and show me live movement" in one click.
+        applyDials(action)
+        navigate('/twin')
+        state.run()
+        break
+      case 'run-simulation':
+        applyDials(action)
+        state.run()
+        break
+      case 'download-brief':
+        if (action.briefRegion) downloadBrief(generateWhatIf(action.briefRegion, 'medium'))
+        break
+      case 'download-portfolio-brief':
+        downloadPortfolioBrief(generatePortfolioOverview())
+        break
+      case 'select-entity':
+        if (action.entityId) state.setSelectedEntity(action.entityId)
+        break
+    }
+  }
+
+  function reply(blocks: Parameters<typeof speechFromBlocks>[0]) {
+    setTurns((prev) => [...prev, { id: nextId(), role: 'assistant', blocks }])
+    if (voiceOut && isVoiceOutputSupported()) {
+      const spoken = speechFromBlocks(blocks)
+      if (spoken) speak(spoken)
     }
   }
 
@@ -113,24 +157,32 @@ export default function CopilotPanel() {
     const text = (explicitText ?? input).trim()
     if (!text || thinking) return
     setInput('')
+    setTurns((prev) => [...prev, { id: nextId(), role: 'user', text }])
 
-    const userTurn: CopilotTurn = { id: nextId(), role: 'user', text }
-    setTurns((prev) => [...prev, userTurn])
+    // Guided automation: mid-wizard, every message answers the current
+    // question instead of going through the general rule engine.
+    if (wizard) {
+      if (isWizardCancel(text)) {
+        setWizard(null)
+        reply(cancelWizardBlocks())
+        return
+      }
+      const result = advanceWizard(wizard, text, state)
+      setWizard(result.wizard)
+      reply(result.blocks)
+      return
+    }
+    if (isAutomationTrigger(text)) {
+      const started = startWizard()
+      setWizard(started.wizard)
+      reply(started.blocks)
+      return
+    }
+
     setThinking(true)
-
     try {
-      const reply = await respondTo(text, state)
-      const assistantTurn: CopilotTurn = {
-        id: nextId(),
-        role: 'assistant',
-        blocks: reply.blocks,
-      }
-      setTurns((prev) => [...prev, assistantTurn])
-
-      if (voiceOut && isVoiceOutputSupported()) {
-        const spoken = speechFromBlocks(reply.blocks)
-        if (spoken) speak(spoken)
-      }
+      const result = await respondTo(text, state)
+      reply(result.blocks)
     } catch {
       setTurns((prev) => [
         ...prev,
@@ -263,7 +315,14 @@ export default function CopilotPanel() {
                     {voiceOut ? <Volume2 size={12} /> : <VolumeX size={12} />}
                   </button>
                 )}
-
+                {wizard && (
+                  <span
+                    title={`Guided scenario builder active — step: ${wizard.step}. Answer the question above, or say "cancel" to stop.`}
+                    className="flex items-center gap-1 rounded-full border border-warning-amber/40 bg-warning-amber/10 px-2 py-0.5 font-mono text-[8.5px] tracking-wide text-warning-amber"
+                  >
+                    GUIDED MODE
+                  </span>
+                )}
                 <button
                   onClick={() => setExpanded(!expanded)}
                   className="flex h-7 w-7 items-center justify-center rounded border border-border-subtle text-text-muted hover:text-text-primary transition-colors cursor-pointer"
@@ -358,7 +417,15 @@ export default function CopilotPanel() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 disabled={thinking}
-                placeholder={thinking ? 'Computing shock response…' : listening ? 'Listening…' : 'Ask Copilot about exposure, loss, interventions…'}
+                placeholder={
+                  thinking
+                    ? 'Computing shock response…'
+                    : listening
+                      ? 'Listening…'
+                      : wizard
+                        ? 'Type your answer, or click an option above…'
+                        : 'Ask Copilot about exposure, loss, interventions…'
+                }
                 className="flex-1 bg-transparent font-mono text-[11.5px] text-text-primary placeholder:text-text-muted focus:outline-none disabled:opacity-50"
               />
 
