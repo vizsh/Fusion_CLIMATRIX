@@ -9,11 +9,20 @@ screenshots.
 
 ---
 
-## 1. Command Centre (`/`)
+## 0. Landing Page (`/`)
+
+| Feature | Implementation | Tag |
+|---|---|---|
+| Public orientation page ahead of the workstation | `frontend/src/landing/` — problem/solution/how-it-works/platform/impact/roadmap sections | Real |
+| Framework-alignment callouts | SEBI, RBI, MoEFCC, IRDA, NITI Aayog, GIZ India — static, named as frameworks this prototype is built to align with, not certified by | Real (disclosed positioning, not a claim of endorsement) |
+| "Open Platform" entry point | Routes into the Command Centre workstation (`/app`) | Real |
+
+## 1. Command Centre (`/app`)
 
 | Feature | Implementation | Tag |
 |---|---|---|
 | One-click flagship scenario launch | `CommandCentrePage.tsx` → `useScenarioStore.run()` | Real action |
+| Live orbital 3D globe with propagation arcs | `frontend/src/components/globe/` (Three.js / React Three Fiber) — `GlobeScene`, `PropagationArcs`, `HazardFootprint`, `CompanyMarkers` | Real, modeled propagation |
 | Real-world grounding (RBI 2024 climate stress-test pilot figures) | Static citation, sourced to RBI Bulletin, 18 Jan 2024 | Sourced |
 | Quick links into every module | — | Real |
 

@@ -1,28 +1,48 @@
-# CLIMATRIX India
+<p align="center">
+  <img src="docs/images/landing-page.jpg" alt="CLIMATRIX India — landing page: 'Know your climate exposure. Act before it costs you.'" width="100%">
+</p>
 
-**Climate-risk intelligence for investment portfolios — built for FIN-04 ("Climate Exposure Graph for Investment Portfolios"), BlackRock, Fusion 2026.**
+<h1 align="center">CLIMATRIX India</h1>
+<p align="center"><b>A climate-exposure graph for investment portfolios — built for FIN-04 (BlackRock, Fusion 2026)</b></p>
+
+<p align="center">
+  <img alt="Status" src="https://img.shields.io/badge/status-working_prototype-2dd4a7?style=flat-square">
+  <img alt="Frontend" src="https://img.shields.io/badge/frontend-React_19_%2B_TypeScript-55DCC0?style=flat-square">
+  <img alt="Backend" src="https://img.shields.io/badge/backend-FastAPI_%2B_SQLAlchemy-5B9BDD?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/backend_tests-48_passing-2dd4a7?style=flat-square">
+  <img alt="License" src="https://img.shields.io/badge/license-see_repo-lightgrey?style=flat-square">
+  <img alt="Hackathon" src="https://img.shields.io/badge/Fusion_2026-FIN--04-F3B65D?style=flat-square">
+</p>
+
+<p align="center">
+  <b>FinTech · ClimateTech · RegTech · ESG · Physical &amp; Transition Climate Risk · Credit Risk Analytics ·<br>
+  Graph-Native Financial Modeling · Explainable AI · Digital Twin · Parametric Insurance · Protection Gap</b>
+</p>
 
 CLIMATRIX models how a single physical climate hazard propagates through real
 economic structure — infrastructure, suppliers, borrowers, lenders, insurers —
-to a financial number a bank, investor or insurer can act on. Change a
-scenario dial and watch the exposure graph, the 3D digital twin, the credit
-loss, the equity impact and the insurance protection gap all move together,
-because they're all reading the same state.
+to a financial number a bank, investor or insurer can act on. Move a scenario
+dial and watch the exposure graph, the 3D digital twin, the credit loss, the
+equity impact, the insurance protection gap, and a 20-year climate-intensification
+trajectory all move together, because every view reads the exact same
+underlying state. Describe a scenario in plain English, or let the built-in AI
+Copilot ask you five questions and build it for you — then download a
+decision-ready PDF brief.
 
-> **Everything in this README is a real, working screenshot of the running
-> app** — not a mockup. See [Honest limitations](#honest-limitations--what-this-is-not) for exactly what's real data vs. illustrative.
-
-<p align="center">
-  <img src="docs/images/digital-twin.jpg" alt="CLIMATRIX Digital Twin — real 3D terrain, satellite imagery, DEM-derived flood ribbon over the Kullu-Manali valley" width="100%">
-</p>
+> **Every screenshot in this README is the actual running app, captured live
+> — not a mockup or a wireframe.** See
+> [Honest limitations](#honest-limitations--what-this-is-not) for exactly
+> what's real data vs. disclosed illustrative modeling.
 
 ---
 
 ## Table of contents
 
+- [Project at a glance](#project-at-a-glance)
 - [What problem this solves](#what-problem-this-solves)
 - [Feature tour, with screenshots](#feature-tour-with-screenshots)
 - [Full feature list](#full-feature-list)
+- [Why this is a strong FIN-04 submission](#why-this-is-a-strong-fin-04-submission)
 - [Architecture](#architecture)
 - [Tech stack](#tech-stack)
 - [Real external data](#real-external-data)
@@ -32,6 +52,23 @@ because they're all reading the same state.
 - [Honest limitations — what this is not](#honest-limitations--what-this-is-not)
 - [Roadmap](#roadmap)
 - [Documentation index](#documentation-index)
+
+---
+
+## Project at a glance
+
+| | |
+|---|---|
+| **Problem statement** | FIN-04 — "Climate Exposure Graph for Investment Portfolios" (BlackRock, Fusion 2026) |
+| **Category** | FinTech · ClimateTech · RegTech · Risk Analytics · ESG tooling |
+| **Core idea** | One graph, one shared state — hazard → infrastructure → supplier → company → bank/insurer, propagated to a real financial number |
+| **Pages** | 14 routes: a public landing page + 13 workstation pages, plus a floating AI Copilot on every one |
+| **Frontend** | React 19, TypeScript, Vite, Zustand, MapLibre GL (3D terrain), Three.js/R3F (orbital globe), `@xyflow/react`, ECharts, Tailwind v4 |
+| **Backend** | FastAPI, SQLAlchemy 2.0, Alembic-migrated SQLite, scikit-learn, 7 live external connectors |
+| **AI layer** | Rules-first Copilot with a local Ollama fallback — a closed intent list, zero hallucinated numbers, a guided multi-turn automation wizard, and free-text scenario understanding |
+| **Tests** | 48 passing backend tests (financial/insurance-formula parity, connector honesty, ML/NLP, API surface) + `tsc -b` + `oxlint` + production build, all on every push via GitHub Actions |
+| **Data honesty** | Four-way evidence taxonomy (`sourced` / `modelled` / `assumption` / `synthetic`) attached per data point, graph-wide — not a single disclaimer banner |
+| **Deliverables** | Live interactive prototype, structured PDF briefs (scenario/company/portfolio-trajectory), a fingerprinted AI-context handoff protocol (Griid Bridge), full documentation set below |
 
 ---
 
@@ -52,6 +89,26 @@ is** (see [Evidence integrity system](#evidence-integrity-system)). Nothing
 is a black-box confidence score.
 
 ## Feature tour, with screenshots
+
+### Landing page — the public entry point
+
+<img src="docs/images/landing-page.jpg" width="100%">
+
+A standalone marketing/orientation page (`/`, `frontend/src/landing/`) ahead
+of the workstation — problem framing, solution summary, a "how it works"
+walkthrough, and explicit alignment callouts (SEBI, RBI, MoEFCC, IRDA, NITI
+Aayog, GIZ India) so a reviewer lands on *why this exists* before touching a
+single dial. "Open Platform" drops straight into the Command Centre below.
+
+### Command Centre — the opening frame of the workstation
+
+<img src="docs/images/command-centre.jpg" width="100%">
+
+One scenario summary, a live orbital 3D globe (Three.js/React Three Fiber)
+showing the active hazard's propagation arcs across India in real time, a
+regulatory-benchmark strip grounded in the RBI's own 2024 climate
+stress-test pilot figures, and one-click launch into a flagship stress run —
+so the "why does this matter" case is made before any dial is touched.
 
 ### Digital Twin — real 3D terrain, real elevation, modeled hazard propagation
 
@@ -142,13 +199,74 @@ dependency, kept visually distinct), live stressed PD/LGD, and — new — an
 claim payout reduces the lender's effective loss-given-default, shown next
 to the plain stressed figure. Exports a lending brief as a text file.
 
-### Command Centre — the opening frame
+### Portfolio Dashboard — the institutional landing view, with a 20-year trajectory
 
-<img src="docs/images/command-centre.jpg" width="100%">
+<img src="docs/images/portfolio-dashboard.jpg" width="100%">
+<img src="docs/images/climate-trajectory.jpg" width="100%">
 
-One scenario summary, one-click launch into a flagship stress run, and
-real-world grounding (RBI's own 2024 climate stress-test pilot figures) so
-the "why does this matter" case is made before any dial is touched.
+A KPI strip, a physical-vs-transition risk split, sector sensitivity vs.
+contribution, and derived concentration alerts — then, below the fold, the
+feature that answers the "gradual, long-term effect" question a point-in-time
+stress test can't: a **selectable Low/Moderate/High intensification pathway**
+projecting this same portfolio's combined physical + transition
+climate-adjusted loss across a 20-year horizon, with rule-based
+recommendations thresholded against the trajectory's own numbers (not a
+generic platitude) and a one-click structured PDF brief.
+
+### Real Market Climate Sensitivity — 18 real listed companies, a due-diligence verdict
+
+<img src="docs/images/real-market-sensitivity.jpg" width="100%">
+
+A separate lens from the synthetic demo portfolio: real, publicly listed
+Indian companies (Taj/Indian Hotels, Adani Green, L&T, UltraTech Cement,
+ICICI Lombard, TCS, Sun Pharma and more), ranked by a scenario-aware
+sensitivity index, each with the same **20-year trajectory mechanic** as the
+Portfolio Dashboard — producing an explicit verdict ("HIGH — reconsider or
+price in a premium", in the screenshot above) a credit or equity analyst can
+actually use when weighing whether to take a new position, with the
+reasoning spelled out, not just a score.
+
+### Scenario Lab & What-If Analysis — build any scenario, in numbers or in English
+
+<img src="docs/images/scenario-lab.jpg" width="100%">
+<img src="docs/images/what-if-analysis.jpg" width="100%">
+
+Scenario Lab is the raw dial console — region, hazard, severity, duration,
+substitutability — with a live plain-English summary that updates on every
+change. What-If Analysis goes further: describe a scenario in a normal
+sentence ("a severe cyclone hits Kerala and lasts 9 months with limited
+supply-chain alternatives") and CLIMATRIX parses what it can find, **shows
+you what it had to default** ("No duration found — defaulted to 6 months"),
+applies it live, and runs it through the exact same engine as every other
+page — downloadable as a structured PDF brief with the original sentence
+quoted verbatim.
+
+### Governance & Proposals — the Griid Bridge
+
+<img src="docs/images/governance-griid-bridge.jpg" width="100%">
+
+A disclosed modelling assumption gets proposed with a rationale and
+reviewed, never changed live — a real audit trail backed by the FastAPI
+service. Alongside it, the **Griid Bridge**: a fingerprinted, two-way
+context handoff — copy or download the active scenario (or the
+*approved-only* assumption ledger) as a bundle any AI workspace can read,
+copy a shareable link that restores it exactly for anyone who opens it, and
+paste a bundle back in — yours, a teammate's, or round-tripped through
+ChatGPT/Claude — with the fingerprint re-checked for drift on import.
+
+### AI Copilot — operates the dashboard, understands you, never invents a number
+
+<img src="docs/images/ai-copilot.jpg" width="100%">
+
+Say "automate" and the Copilot asks one question at a time — region,
+hazard, severity, duration, substitutability — then sets every dial itself
+and reports the modeled outcome, the same engine every page already uses.
+Describe a detailed scenario directly in chat and it runs immediately
+instead of asking; ask something this platform genuinely has no model for
+(political unrest, security risk, a macro shock) and it says so honestly
+instead of substituting unrelated scenario data — see
+["Why this is a strong FIN-04 submission"](#why-this-is-a-strong-fin-04-submission)
+for the live bug this exact honesty check was built to catch.
 
 ---
 
@@ -395,10 +513,41 @@ a structured PDF brief that includes the original text verbatim.
   frontend, connector honesty under failure, ML/NLP/data-quality coverage,
   API surface.
 
+## Why this is a strong FIN-04 submission
+
+A reviewer scoring this against typical hackathon/FinTech-challenge criteria
+— innovation, technical depth, completeness, real-world applicability,
+business viability, and responsible-AI practice — can verify every claim
+below directly against the running app and the source, not just this
+paragraph:
+
+| Evaluation axis | What CLIMATRIX actually does |
+|---|---|
+| **Problem-statement fidelity** | FIN-04 asks for a dynamic graph connecting companies, facilities, suppliers, routes, regions and hazards to financial exposure, simulating second/third-order effects and surfacing hidden exposure — that is literally `indiaGraphData.ts` + `graphAnalytics.ts`'s BFS traversal + `computeBottlenecks()`, not a reinterpretation of the brief. |
+| **Technical depth & originality** | A real 3D digital twin (MapLibre terrain + an orbital Three.js globe), a DEM-decoded flood ribbon from actual elevation pixels (not a drawn circle), a graph-propagated financial engine shared identically across 13 pages, a 20-year climate-intensification trajectory distinct from the point-in-time stress dial, and an AI Copilot that computes nothing itself — every number traces to one of a closed set of deterministic functions. |
+| **Explainable / responsible AI** | No generative model ever produces a number. A four-way evidence taxonomy (`sourced`/`modelled`/`assumption`/`synthetic`) is attached per data point graph-wide. The Copilot has an explicit out-of-scope guard: a question about political unrest or security risk gets an honest "I don't know, this tool can't compute that" instead of a hallucinated answer substituting the active climate scenario — a real bug caught via live testing and fixed, documented in the commit history, not swept under the rug. |
+| **Real external data, not a static demo** | 7 live connectors (NASA POWER, dual Open-Meteo, Tomorrow.io, NewsAPI+GNews, AlphaAI, OSM Overpass) with honest `ok`/`unconfigured`/`error`/`mock` status reporting — never a faked success. |
+| **Completeness / production-mindedness** | A migration-managed (Alembic) backend schema, 48 passing automated tests, CI on every push (`.github/workflows/ci.yml`), numerically-verified formula parity between the TypeScript and Python financial engines, and a documented, honest audit of exactly what's prototype-stage vs. production-ready (see [Honest limitations](#honest-limitations--what-this-is-not)). |
+| **Business & regulatory grounding** | Figures benchmarked against the RBI's own 2024 VAST climate-stress-test pilot; a PMFBY-style subsidized insurance mechanic modeling a real government scheme's structure; explicit framework-alignment callouts (SEBI, RBI, MoEFCC, IRDA, NITI Aayog, GIZ India) on the landing page. |
+| **Usability for a non-technical judge** | A public landing page explaining the problem before the workstation; a guided, five-question AI wizard that builds and runs a full scenario for someone who has never touched the dials; a free-text box that understands a plain English sentence; structured, downloadable PDF briefs instead of requiring a judge to read a dashboard screenshot. |
+
+**Keywords** (for search/classification): climate risk, physical climate
+risk, transition risk, climate-exposure graph, credit risk, expected credit
+loss, PD/LGD modeling, portfolio risk analytics, ESG, TCFD, protection gap,
+parametric insurance, index insurance, basis risk, crop insurance, PMFBY,
+RBI climate stress test, VAST, digital twin, 3D terrain visualization,
+dependency graph, supply-chain risk, graph neural analytics, explainable AI,
+responsible AI, LLM guardrails, retrieval-free rules-first chatbot, FastAPI,
+React, TypeScript, Zustand, scikit-learn, anomaly detection, NLP semantic
+search, FinTech, ClimateTech, RegTech, InsurTech, India, BlackRock FIN-04,
+Fusion 2026 hackathon.
+
 ## Architecture
 
 ```mermaid
 flowchart LR
+    Landing["Public landing page (/)\nfrontend/src/landing/"] -- "Open Platform →" --> Pages
+
     subgraph Frontend["Frontend — Vite + React 19 + TypeScript"]
         Graph["indiaGraphData.ts\n60 nodes · 95 edges"]
         Store["useScenarioStore\n(Zustand) — single source of truth"]
